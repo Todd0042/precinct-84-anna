@@ -137,7 +137,7 @@ async function main() {
   });
   await sessEp.startShift({ resumeSaved: false });
   assert.equal(rt.calls.length, 1, 'Episodic Ch.1 must use 1 single LLM call');
-  assert.ok(rt.calls[0].systemPrompt.includes('6 to 8 full linked beats') && rt.calls[0].maxTokens >= 6000, 'Chapters must request 6-8 rich beats with ample token cap');
+  assert.ok(rt.calls[0].systemPrompt.includes('6 to 8 full linked beats') && rt.calls[0].systemPrompt.includes('4 to 6') && rt.calls[0].maxTokens >= 8000, 'Chapters must request 6-8 rich beats with doubled scene depth and 8192 token cap');
   assert.equal(sessEp.getState().aiCampaign.storyGenMode, 'episodic');
   sessEp.runCmd('arrest_rival');
   assert.equal(sessEp.getState().aiCampaign.awaitingNextChapter, true);
@@ -284,6 +284,7 @@ async function main() {
   await sessT2Ep.waitForAi();
   assert.equal(rt.calls.length, callsBeforeT2Ep + 1, 'Tier 2 1-by-1 compiles act intermission on transition');
   assert.ok(rt.calls.at(-1).systemPrompt.includes('dirty harbor vice payoff ring'), 'Tier 2 prompt injects sanitized theme');
+  assert.ok(rt.calls.at(-1).systemPrompt.includes('6 to 8'), 'Tier 2 prompt requests doubled 6 to 8 lines');
   // Changing state.storyTheme later must NOT override a story's original locked theme (_theme / outline.storyTheme)
   sessT2Ep.setStoryTheme('totally different theme');
   await sessT2Ep.replaySameStory();

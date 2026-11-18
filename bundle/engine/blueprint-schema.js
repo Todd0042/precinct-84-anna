@@ -78,7 +78,7 @@ export function validateSingleIntermission(src = {}, key, fallbackSeed = {}, ass
   const speakerId = snapCharacterId(src?.speakerId, defSpeaker, assetPool?.allCharacterIds);
   const speakerMood = String(src?.speakerMood || 'calm');
   const cleanLines = Array.isArray(src?.lines) && src.lines.length
-    ? src.lines.slice(0, 4).map((l) => sanitizeProseAssetIds(l))
+    ? src.lines.slice(0, 10).map((l) => sanitizeProseAssetIds(l))
     : ['Rain drums against the roof while Oakridge dispatch crackles over Channel 1.'];
   const actors = normalizeStageActors(src?.actors, sceneId, cleanLines, assetPool?.allCharacterIds, speakerId);
   const stageProps = normalizeStageProps(src?.stageProps || src?.props, sceneId, cleanLines);

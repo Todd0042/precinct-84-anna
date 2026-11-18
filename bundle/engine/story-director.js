@@ -51,7 +51,7 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
     `Allowed assets ONLY:\n${manifest}`,
     ...(themeLine ? [themeLine] : []),
     'Transitions: precinct_yard->crosswalk_redlight, interrogation_room->motel_exterior, motel_lab->pier84_exterior.',
-    'Write 3 to 4 rich lines of dialogue/drama per intermission with stage blocking ("actors", optional "timeline" cues: move/pickup/speak/fire). Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
+    'Write 6 to 8 rich lines of dialogue/drama per intermission with stage blocking ("actors", optional "timeline" cues: move/pickup/speak/fire). Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
     'Return ONLY JSON: {"intermissions":[{"transitionKey":"...","title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","actors":[{"id":"...","outfit":"police_uniform|bad_guy|casual|formal|naked","prop":"cigarette|coffee_cup|whiskey_glass|pistol|...","pose":"stand|chill|sit|lie_bed|smoke|aim","at":"booth_left|bed_left|center|doorway"}],"timeline":[{"type":"move|pickup|speak|fire","actorId":"...","speakerId":"...","prop":"...","line":"..."}],"lines":["...","...","..."],"choices":[{"label":"...","command":"...","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}]}',
   ].join('\n');
 
@@ -61,7 +61,7 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
       systemPrompt: sys,
       messages: [{ role: 'user', content: 'Compile a cohesive 3-intermission noir arc bridging Acts I->II, II->III, and III->IV.' }],
       selectedModel: next.aiModel,
-      maxTokens: 2400,
+      maxTokens: 4000,
       temperature: 0.72,
       stage: 'Compile Tier 2 Intermissions',
       onProgress,
@@ -98,7 +98,7 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
       formatChapterAssetPoolPrompt(pool),
       ...(themeLine ? [themeLine] : []),
       `Prior Intermissions: ${prior || 'None yet'} | Alignment: ${JSON.stringify(next.alignment || {})}`,
-      'Write 3 to 4 vivid lines of scene & dialogue with visual-novel blocking ("actors" w/ outfit/prop/pose/at + optional "timeline" cues: move/pickup/speak/fire). Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","actors":[{"id":"...","outfit":"casual|formal|naked|police_uniform|bad_guy","prop":"cigarette|coffee_cup|whiskey_glass|pistol","pose":"chill|sit|lie_bed|smoke|stand","at":"booth_left|bed_left|doorway|center"}],"timeline":[{"type":"speak","speakerId":"...","line":"..."}],"lines":["...","...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
+      'Write 6 to 8 vivid lines of scene & dialogue with visual-novel blocking ("actors" w/ outfit/prop/pose/at + optional "timeline" cues: move/pickup/speak/fire). Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","actors":[{"id":"...","outfit":"casual|formal|naked|police_uniform|bad_guy","prop":"cigarette|coffee_cup|whiskey_glass|pistol","pose":"chill|sit|lie_bed|smoke|stand","at":"booth_left|bed_left|doorway|center"}],"timeline":[{"type":"speak","speakerId":"...","line":"..."}],"lines":["...","...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
     ].join('\n');
     let raw = '';
     try {
@@ -106,7 +106,7 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
         systemPrompt: sys,
         messages: [{ role: 'user', content: `Generate single between-calls scene for ${transitionKey}.` }],
         selectedModel: next.aiModel,
-        maxTokens: 1100,
+        maxTokens: 2000,
         temperature: 0.72,
         stage: 'Compile Act Dramatization',
         onProgress,
@@ -136,7 +136,7 @@ function buildChapterCompilerSystemPrompt({ manifest, biblePrompt, includeCaseFi
     'You are the Precinct 84 Screenplay & Story Compiler. Direct ONE playable visual-novel noir Chapter JSON using ONLY the asset IDs below.',
     manifest,
     biblePrompt,
-    'RULES: Write 6 to 8 full linked beats pacing a complete investigative episode (crime scene -> witness/informant -> lab/clue -> bedroom/diner tension -> suspect confrontation -> climax). Direct every beat like a screenplay: block actors w/ outfit, prop, pose, landmark, stageProps, and timeline cues (move, pickup, speak, fire). Realistic Zero-HP Rule: NEVER mention health bars/HP; gunshots cause realistic injuries (wounded_leg/hospitalized) or death (fatal/dead). Keep each beat to 2-3 vivid narrative paragraphs, 2-3 choices, action "label" <= 20 chars, "title" <= 48 chars, display names in prose. Set endChapter:true ONLY on final beat.',
+    'RULES: Write 6 to 8 full linked beats pacing a complete investigative episode (crime scene -> witness/informant -> lab/clue -> bedroom/diner tension -> suspect confrontation -> climax). Make every scene beat TWICE AS LONG: write 4 to 6 rich narrative & quoted-dialogue paragraphs per beat (sensory atmosphere, back-and-forth character conversation, physical stage blocking, and clue discovery) plus 2 to 3 sentence outcome "log" text per choice. Direct every beat like a screenplay: block actors w/ outfit, prop, pose, landmark, stageProps, and timeline cues (move, pickup, speak, fire). Realistic Zero-HP Rule: NEVER mention health bars/HP; gunshots cause realistic injuries (wounded_leg/hospitalized) or death (fatal/dead). Keep 2-3 choices, action "label" <= 20 chars, "title" <= 48 chars, display names in prose. Set endChapter:true ONLY on final beat.',
     `Return ONLY JSON: ${schema}`,
   ].join('\n');
 }
@@ -157,7 +157,7 @@ async function compileChapterWithOutline({ anna, campaignStub, chapterNum, align
       systemPrompt: sys,
       messages: [{ role: 'user', content: `Compile Chapter ${chapterNum}${isFinal ? ' (FINAL SHOWDOWN EPISODE)' : ''}: ${arcHint}` }],
       selectedModel,
-      maxTokens: 6000,
+      maxTokens: 8192,
       temperature: 0.72,
       stage,
       onProgress,
@@ -198,7 +198,7 @@ export async function compileNewAiCampaign({ anna, state, continuation = false, 
           systemPrompt: sys,
           messages: [{ role: 'user', content: continuation ? 'Create episodic Chapter 1 of Case #84-002 sequel with Marcus Mercer (#084) & Claire Bellamy (#089).' : 'Create a gritty 1984 Oakridge noir episodic Chapter 1 with dirty-cop/rogue temptations and a sharp cliffhanger.' }],
           selectedModel: next.aiModel,
-          maxTokens: 6000,
+          maxTokens: 8192,
           temperature: 0.75,
           stage: 'Compile Episodic Ch.1',
           onProgress,
