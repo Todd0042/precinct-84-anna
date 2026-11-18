@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Precinct 84: SVGA AI Detective</title>
+    <link rel="stylesheet" href="./vendor/xterm.css" />
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <main class="app-shell" id="app-shell">
+      <header class="topbar">
+        <div class="brand-group">
+          <span class="status-dot standalone" id="status-dot" title="Connecting to Anna Runtime..."></span>
+          <span class="brand-title" id="status-label">Precinct 84</span>
+          <span class="badge badge-score" id="score-badge">Score: 0/100</span>
+          <span class="badge badge-scene" id="scene-badge">TIER 1</span>
+          <span class="badge badge-save" id="save-status-badge" title="Active Tier & Story Backup Status">SAVED</span>
+        </div>
+        <div class="action-bar" role="toolbar" aria-label="Game controls">
+          <button type="button" class="hdr-btn" id="btn-scale-mode" title="Toggle Fit vs 1:1 Pan scaling">Fit: ON</button>
+          <button type="button" class="hdr-btn" id="btn-tiers" title="Save active tier & switch Tier/Model">Tiers</button>
+          <button type="button" class="hdr-btn hdr-accent" id="btn-stories" title="Browse saved AI stories, Export or Import JSON">Stories</button>
+          <button type="button" class="hdr-btn hdr-accent" id="btn-ask-claire" title="Ask Partner Claire (#089)">Ask Claire</button>
+          <button type="button" class="hdr-btn" data-action="manual" id="btn-manual" title="Field Guide (F1)">F1 Manual</button>
+          <button type="button" class="hdr-btn" data-action="audio" id="btn-audio" title="Toggle SFX (F2)">F2 SFX: ON</button>
+          <button type="button" class="hdr-btn" data-action="music" id="btn-music" title="Toggle AdLib Music (F3)">F3 BGM: ON</button>
+          <button type="button" class="hdr-btn" id="btn-tts" title="Free Browser Gendered Voice Narration (no AI credits)">TTS: OFF</button>
+          <button type="button" class="hdr-btn" id="btn-autoplay" title="Auto-Play: Sequential Options (0 LLM) or AI Choice">Auto: OFF</button>
+          <button type="button" class="hdr-btn hdr-warn hidden" id="btn-auto-pause" title="Pause / Resume Auto-Play after the current sentence finishes">Pause</button>
+          <button type="button" class="hdr-btn" data-action="save" id="btn-save" title="Quick Save (F5)">F5 Save</button>
+          <button type="button" class="hdr-btn" data-action="restore" id="btn-restore" title="Restore quicksave">Restore</button>
+          <button type="button" class="hdr-btn hdr-warn" data-action="undo" id="btn-undo" title="Undo (F9)">F9 Undo</button>
+          <button type="button" class="hdr-btn hdr-danger" id="btn-reset" title="Restart / Regenerate Story">Reset</button>
+        </div>
+      </header>
+
+      <div class="llm-progress-bar hidden" id="llm-progress-bar" role="status" aria-live="polite">
+        <span class="llm-spinner" aria-hidden="true"></span>
+        <span class="llm-progress-text" id="llm-progress-text">Contacting Anna AI...</span>
+        <span class="llm-progress-track"><span class="llm-progress-fill"></span></span>
+      </div>
+
+      <div class="error-panel hidden" id="error-panel" role="alert">
+        <div class="error-head">
+          <span class="error-title" id="error-title">Error Encountered</span>
+          <span class="error-tag" id="error-demo-tag">DEMO FULL TRACE</span>
+          <div class="error-btns">
+            <button type="button" class="hdr-btn" id="btn-copy-error">Copy</button>
+            <button type="button" class="hdr-btn hdr-danger" id="btn-dismiss-error">Dismiss</button>
+          </div>
+        </div>
+        <div class="error-summary" id="error-summary"></div>
+        <pre class="error-details hidden" id="error-details-pre"></pre>
+      </div>
+
+      <section class="svga-stage" id="svga-stage" aria-label="Precinct 84 SVGA scene viewport">
+        <canvas id="svga-canvas" class="svga-canvas" width="480" height="270"></canvas>
+      </section>
+
+      <section class="xterm-stage" id="xterm-stage" aria-label="Precinct 84 text log console">
+        <div class="xterm-viewport-box" id="xterm-viewport-box">
+          <div class="xterm-scale-wrap" id="xterm-scale-wrap">
+            <div id="xterm-container" class="xterm-container"></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="touch-dock" id="touch-dock">
+        <div class="ai-setup-stack" id="ai-setup-strip">
+          <div class="ai-setup-strip">
+            <button type="button" class="hdr-btn hdr-danger" id="btn-delete-save" title="Delete saved progress or generated story for the selected tier">Delete Save</button>
+            <label class="ai-setup-label" for="ai-model-select">AI Model:</label>
+            <select id="ai-model-select" class="ai-model-select" aria-label="Select Anna AI Model"></select>
+            <button type="button" class="hdr-btn hdr-accent hidden" id="btn-gen-mode" title="Toggle 1-part-at-a-time vs Full Story upfront">Gen: Ch x Ch</button>
+            <button type="button" class="hdr-btn hdr-send" id="btn-start-shift">Start Shift</button>
+          </div>
+          <div class="ai-setup-strip">
+            <label class="ai-setup-label" for="ai-theme-input">Theme:</label>
+            <input type="text" id="ai-theme-input" class="ai-model-select" maxlength="80" placeholder="Optional theme/vibe (e.g. corrupt vice ring, midnight romance, IA mole)..." aria-label="Story theme suggestion" autocomplete="off" spellcheck="false" />
+          </div>
+        </div>
+        <div class="chip-strip" id="chip-strip" aria-label="Suggested command chips"></div>
+        <form class="touch-cmd-form" id="touch-cmd-form" autocomplete="off">
+          <span class="cmd-prompt">&gt;</span>
+          <input
+            type="text"
+            id="touch-cmd-input"
+            class="touch-cmd-input"
+            placeholder="Type command (e.g. listen briefing) or tap chips above..."
+            aria-label="Command input"
+            autocomplete="off"
+            autocapitalize="none"
+            autocorrect="off"
+            spellcheck="false"
+            data-gramm="false"
+          />
+          <button type="submit" class="hdr-btn hdr-send">Run</button>
+        </form>
+      </footer>
+    </main>
+
+    <dialog id="modal-delete-save" class="reset-dialog">
+      <h3 id="delete-save-title">Delete Tier Save</h3>
+      <p id="delete-save-desc">Delete only your current progress (keeping the generated story), or delete the entire generated story as well?</p>
+      <div class="dialog-actions">
+        <button type="button" class="hdr-btn hdr-accent" id="btn-delete-progress">Delete Progress Only (Keep Story)</button>
+        <button type="button" class="hdr-btn hdr-danger" id="btn-delete-all">Delete Progress &amp; Generated Story</button>
+        <button type="button" class="hdr-btn" id="btn-delete-cancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="modal-reset" class="reset-dialog">
+      <h3>Restart Active Tier</h3>
+      <p>Keep your generated blueprint &amp; replay cleanly from Chapter 1, or compile a brand-new story with your selected AI model?</p>
+      <div class="dialog-actions">
+        <button type="button" class="hdr-btn hdr-accent" id="btn-reset-keep">Keep Generated Story (Replay Ch. 1)</button>
+        <button type="button" class="hdr-btn hdr-warn" id="btn-reset-new">Generate New Story (Uses AI Credits)</button>
+        <button type="button" class="hdr-btn" id="btn-reset-cancel">Cancel</button>
+      </div>
+    </dialog>
+
+    <dialog id="modal-stories" class="reset-dialog story-dialog">
+      <div class="story-modal-head">
+        <h3>Saved AI Stories (Tier 2 &amp; Tier 3)</h3>
+        <button type="button" class="hdr-btn" id="btn-close-stories">Close</button>
+      </div>
+      <div class="story-toolbar">
+        <button type="button" class="hdr-btn hdr-accent" id="btn-export-active-story">Export Current JSON</button>
+        <button type="button" class="hdr-btn" id="btn-export-all-stories">Export All JSON</button>
+        <label class="hdr-btn import-file-label">Import .JSON<input type="file" id="import-story-file" accept=".json,application/json" hidden /></label>
+      </div>
+      <div id="story-library-list" class="story-list"></div>
+      <div class="story-paste-wrap">
+        <textarea id="import-story-paste" rows="2" placeholder="Or paste exported Precinct 84 story JSON here..."></textarea>
+        <button type="button" class="hdr-btn hdr-send" id="btn-import-story-paste">Import Paste</button>
+      </div>
+    </dialog>
+  </body>
+</html>

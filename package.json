@@ -1,0 +1,27 @@
+{
+  "name": "precinct-84-anna",
+  "version": "0.1.0",
+  "description": "Precinct 84: Case I - Blue Velvet packaged as an Anna OS xterm.js static-spa app.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build:vendor": "node ./scripts/build-vendor.js",
+    "test": "npm run test:e2e",
+    "test:e2e": "node ./tests/e2e-anna-xterm.test.js && node ./tests/e2e-anna-ai.test.js && node ./tests/e2e-episodic-continuity.test.js",
+    "validate": "anna-app validate --strict"
+  },
+  "keywords": [
+    "anna-app",
+    "xterm",
+    "precinct-84",
+    "police-quest",
+    "ega",
+    "ansi"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "esbuild": "^0.28.2"
+  }
+}

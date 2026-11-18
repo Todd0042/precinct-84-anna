@@ -1,0 +1,26 @@
+# Secrets & Credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*
+*credentials*
+
+# Dependencies & Runtime
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.precinct-84/
+saves/
+*.wav
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/

@@ -1,0 +1,28 @@
+{
+  "schema": 4,
+  "required_executas": [],
+  "tags": ["games", "detective", "parser", "xterm", "ansi", "retro", "precinct-84"],
+  "ui": {
+    "bundle": {
+      "format": "static-spa",
+      "entry": "index.html",
+      "external_origins": []
+    },
+    "views": [
+      {
+        "name": "main",
+        "title": "Precinct 84 — High-Res EGA",
+        "default": true,
+        "default_size": { "w": 1060, "h": 820 },
+        "min_size": { "w": 360, "h": 480 }
+      }
+    ],
+    "csp_overrides": {},
+    "state_merge": "last_writer_wins"
+  },
+  "dev": {
+    "fixtures": ["fixtures/*.jsonl"],
+    "seed_storage": {},
+    "user_id": 1
+  }
+}
