@@ -1,6 +1,7 @@
 import { createInitialState, addLog, cloneState } from '../game/state.js';
 import { SCENE_CATALOG } from '../assets/scene-catalog.js';
 import { MAIN_MENU_BGM_ID } from '../assets/audio-catalog.js';
+import { buildPlayableStateFromEntry } from '../storage-library.js';
 import { INTERMISSION_TRANSITIONS } from '../engine/case-context.js';
 import { formatDetailedError } from '../engine/anna-ai.js';
 import {
@@ -172,6 +173,17 @@ export function createAiTaskRunner({ anna, audio, saveStore, storyLib, getState,
   return {
     waitForIdle: () => activePromise || Promise.resolve(),
     persistActiveTier,
+    persistActiveTierVerified: (s) => persistVerified(s),
+    loadSavedStoryEntry(entry, resumeProgress = true) {
+      const next = buildPlayableStateFromEntry(entry, { resumeProgress, llmAvailable: Boolean(getState()?.llmAvailable) });
+      setState(next);
+      persistActiveTier(next);
+      syncSceneMusic(next, audio);
+      audio.play('squelch');
+      render();
+      notifyChange();
+      return next;
+    },
     resumeTierSaved(state) {
       const tier = state.aiTier || 1;
       const saved = saveStore ? saveStore.getTierActive(tier) : null;

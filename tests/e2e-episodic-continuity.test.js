@@ -312,6 +312,9 @@ async function main() {
   autoT1.stop();
   assert.equal(sessT1.getState().scene, 'precinct_locker', 'Tier 1 Sequential Auto-Play advances Case I cleanly');
   assert.equal(rt.calls.length, callsBeforeT1, 'Tier 1 Auto: Seq uses 0 LLM calls');
+  await sessT1.returnToModeSelect();
+  assert.equal(sessT1.getState().phase, 'mode_select', 'Main Menu button returns to mode_select');
+  assert.equal(saveStore.getTierActive(1)?.scene, 'precinct_locker', 'Main Menu auto-saves Tier 1 progress');
   sessT1.dispose();
 
   // Dedicated main-menu cop theme is isolated from LLM BGM pools and plays only in mode_select

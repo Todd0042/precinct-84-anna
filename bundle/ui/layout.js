@@ -67,6 +67,7 @@ function formatToolbarHeader(state, audioEq, width, toolbarHitboxes) {
         { label: '[F9:Undo]', action: 'undo' },
       ]
     : [
+        { label: '[Menu]', action: 'modes' },
         { label: '[F1:Manual]', action: 'manual' },
         { label: '[F2:Audio]', action: 'audio' },
         { label: '[F5:Save]', action: 'save' },

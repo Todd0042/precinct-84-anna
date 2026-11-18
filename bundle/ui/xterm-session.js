@@ -4,7 +4,6 @@ import { createAudioEngine } from '../engine/audio.js';
 import { MODEL_PRESETS } from '../engine/anna-ai.js';
 import { buildScreenFrame, HIGHRES_COLS, HIGHRES_ROWS } from './layout.js';
 import { createAiTaskRunner, buildShiftResetState, hasGeneratedStory, replayExistingStory, syncSceneMusic } from './session-ai.js';
-import { buildPlayableStateFromEntry } from '../storage-library.js';
 
 export function createXtermTuiSession({
   term,
@@ -143,16 +142,25 @@ export function createXtermTuiSession({
   }
 
   function returnToModeSelect() {
-    aiRunner.persistActiveTier(state);
-    state = { ...state, phase: 'mode_select' };
+    let saveOp = Promise.resolve(state);
+    if (state.phase === 'playing') {
+      const toSave = { ...state, log: [...(state.log || []), { tag: 'SYSTEM', text: `Auto-saved Tier ${state.aiTier || 1} progress before Main Menu.` }] };
+      saveOp = aiRunner.persistActiveTierVerified(toSave).then(() => state);
+      state = { ...toSave, phase: 'mode_select' };
+    } else {
+      state = { ...state, phase: 'mode_select' };
+    }
     syncSceneMusic(state, audio);
+    audio.play('tick');
     render();
     notifyChange();
+    return saveOp;
   }
 
   function runCmd(cmdText) {
     const trimmed = String(cmdText || '').trim();
     if (!trimmed || aiBusy) return null;
+    if (/^(?:menu|main menu|tiers)$/i.test(trimmed)) return returnToModeSelect();
 
     if (trimmed === 'quit' || trimmed === 'exit' || trimmed === 'restart') {
       resetSession();
@@ -363,16 +371,7 @@ export function createXtermTuiSession({
     replaySameStory,
     regenerateNewStory,
     returnToModeSelect,
-    loadSavedStoryEntry: (entry, resumeProgress = true) => {
-      const next = buildPlayableStateFromEntry(entry, { resumeProgress, llmAvailable: state.llmAvailable });
-      state = next;
-      aiRunner.persistActiveTier(state);
-      syncSceneMusic(state, audio);
-      audio.play('squelch');
-      render();
-      notifyChange();
-      return state;
-    },
+    loadSavedStoryEntry: (entry, resumeProgress = true) => aiRunner.loadSavedStoryEntry(entry, resumeProgress),
     setModelCatalog: (c) => { if (Array.isArray(c) && c.length) { catalog = c; render(); notifyChange(); } },
     resetSession,
     getState: () => state,
