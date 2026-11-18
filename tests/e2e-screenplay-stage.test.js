@@ -21,6 +21,7 @@ import {
 import { buildStoryBiblePrompt } from '../bundle/engine/story-bible.js';
 import { INTERMISSION_TRANSITIONS } from '../bundle/engine/case-context.js';
 import { createXtermTuiSession } from '../bundle/ui/xterm-session.js';
+import { createTtsNarrator } from '../bundle/audio/tts-speaker.js';
 
 function createMockTerm() {
   return { cols: 104, rows: 13, write: () => {}, onData: () => ({ dispose: () => {} }), onResize: () => ({ dispose: () => {} }) };
@@ -280,11 +281,22 @@ async function testStageDirectorBallisticsAndZeroHpRealism() {
   assert.equal(gFinal.condition, 'wounded_leg', 'Non-fatal leg hit sets realistic wounded_leg state');
   assert.equal(gFinal.pose, 'kneel', 'Wounded-leg actor drops to kneel pose');
 
-  // Verify zero health bars anywhere in state + Story Bible continuity + Marcus fatal rewind
+  // Verify zero health bars anywhere in state + Story Bible continuity + TTS ignores trauma/system banners
+  const ttsSpoken = [];
+  class MockUtt { constructor(text) { this.text = text; } }
+  const tts = createTtsNarrator({
+    enabled: true,
+    speechApi: { getVoices: () => [], cancel: () => {}, speak: (u) => { ttsSpoken.push(u.text); u.onend?.(); } },
+    UtteranceCtor: MockUtt,
+  });
+  tts.syncCursor(st);
   const session = createXtermTuiSession({ term: createMockTerm(), initialState: st, audioEnabled: false, tickIntervalMs: 0 });
   assert.equal('hp' in session.getState(), false, 'No HP field allowed on game state');
   session.runCmd('shoot_leg');
   const sAfterLeg = session.getState();
+  tts.ingestState(sAfterLeg);
+  assert.ok(ttsSpoken.some((line) => line.includes("Gallo's knee")), 'TTS reads actual story action text');
+  assert.equal(ttsSpoken.some((line) => /MEDICAL|TRAUMA|health bars|--- CH\./i.test(line)), false, 'TTS must NOT read [MEDICAL / TRAUMA], SYSTEM messages, or scene dividers');
   assert.equal(sAfterLeg.aiCampaign.storyState.injuries.enforcer_gallo, 'wounded_leg');
   session.runCmd('close_case');
   const sAfterDead = session.getState();

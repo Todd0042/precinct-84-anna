@@ -98,7 +98,7 @@ export function executeBlueprintTurn(prevState, rawInput) {
       return { state: next, sfx: 'shot' };
     }
     if (['hospitalized', 'wounded_leg', 'wounded_arm'].includes(action.consequence.status)) {
-      addLog(next, out, 'ALERT', `[MEDICAL / TRAUMA] Physical injury (${action.consequence.status.replace(/_/g, ' ')}) recorded — no arcade health bars; wound persists in case file.`);
+      addLog(next, out, 'SYSTEM', `[MEDICAL / TRAUMA] Physical injury (${action.consequence.status.replace(/_/g, ' ')}) recorded in case file.`);
     }
   }
 

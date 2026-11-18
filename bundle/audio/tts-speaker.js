@@ -40,7 +40,7 @@ export function resolveSpeechProfile(speakerId = 'narrator', voices = []) {
 }
 
 function splitSpeakableChunks(text, maxLen = 190) {
-  const clean = String(text || '').replace(/^[-=>\s]+/, '').replace(/\s+/g, ' ').trim();
+  const clean = String(text || '').replace(/^[-=>\s]+/, '').replace(/^\[[^\]]+\]\s*/, '').replace(/\s+/g, ' ').trim();
   if (!clean) return [];
   if (clean.length <= maxLen) return [clean];
   const out = [];
@@ -54,6 +54,16 @@ function splitSpeakableChunks(text, maxLen = 190) {
     }
   }
   return out;
+}
+
+export function isSpeakableLogEntry(entry) {
+  const txt = String(entry?.text || '').trim();
+  if (!txt) return false;
+  if (entry.tag === 'CMD' || entry.tag === 'SYSTEM' || entry.tag === 'SCENE') return false;
+  if (/^(?:---+|===+)/.test(txt)) return false;
+  if (/^\[(?:MEDICAL|TRAUMA|ERROR|SYSTEM|SAVE|ALERT|DEBUG)[^\]]*\]/i.test(txt)) return false;
+  if (entry.tag === 'ALERT' && /^\[/.test(txt)) return false;
+  return true;
 }
 
 function inferSpeakerForLog(entry, state) {
@@ -180,7 +190,7 @@ export function createTtsNarrator({
       return;
     }
     const logs = Array.isArray(state.log) ? state.log : [];
-    if (lastPhase !== 'playing' || state.storyId !== lastStoryId || logs.length < lastLogCount) {
+    if (lastPhase !== 'playing' || (state.storyId || null) !== lastStoryId || logs.length < lastLogCount) {
       lastLogCount = state.turn > 0 && logs.length > 4 ? logs.length - 2 : 0;
       lastStoryId = state.storyId || null;
       lastPhase = state.phase;
@@ -192,8 +202,7 @@ export function createTtsNarrator({
     const fresh = logs.slice(lastLogCount);
     lastLogCount = logs.length;
     for (const entry of fresh) {
-      if (!entry?.text || entry.tag === 'CMD') continue;
-      if (entry.tag === 'SYSTEM' && /^Saved game/i.test(entry.text)) continue;
+      if (!isSpeakableLogEntry(entry)) continue;
       enqueue(entry.text, inferSpeakerForLog(entry, state));
     }
   }
@@ -224,7 +233,7 @@ export function createTtsNarrator({
         if (logs[i]?.tag === 'SCENE') { startIdx = i; break; }
       }
       for (const entry of logs.slice(startIdx)) {
-        if (entry?.text && entry.tag !== 'CMD' && !(entry.tag === 'SYSTEM' && /^Saved game/i.test(entry.text))) {
+        if (isSpeakableLogEntry(entry)) {
           enqueue(entry.text, inferSpeakerForLog(entry, state));
         }
       }
