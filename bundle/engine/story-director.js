@@ -293,13 +293,17 @@ export async function compileNextBlueprintChapter({ anna, state, onProgress = nu
     onProgress,
   });
   const ch = chRes.chapter;
+  const out = [];
+  if (chRes.error) {
+    camp.awaitingNextChapter = true;
+    addLog(next, out, 'ALERT', `[ERROR] ${chRes.error.headline}: ${chRes.error.summary}`);
+    return { state: next, sfx: 'hazard', error: chRes.error };
+  }
 
   next.victory = false;
   camp.chapters.push(ch);
   camp.chapterIdx = camp.chapters.length - 1;
   camp.awaitingNextChapter = false;
-  const out = [];
-  if (chRes.error) addLog(next, out, 'ALERT', `[ERROR] ${chRes.error.headline}: ${chRes.error.summary}`);
   enterBlueprintBeat(next, ch.beats[ch.openingBeatId], out);
-  return { state: next, sfx: chRes.error ? 'hazard' : ch.beats[ch.openingBeatId]?.sfxId || 'squelch', bgmId: ch.beats[ch.openingBeatId]?.bgmId, error: chRes.error };
+  return { state: next, sfx: ch.beats[ch.openingBeatId]?.sfxId || 'squelch', bgmId: ch.beats[ch.openingBeatId]?.bgmId, error: null };
 }

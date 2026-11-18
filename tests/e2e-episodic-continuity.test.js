@@ -9,7 +9,8 @@ import { PrecinctSaveStore } from '../bundle/storage.js';
 import { createXtermTuiSession } from '../bundle/ui/xterm-session.js';
 import { createTtsNarrator, resolveSpeechProfile } from '../bundle/audio/tts-speaker.js';
 import { createAutoPlayer } from '../bundle/engine/auto-player.js';
-import { chooseAutoPlayOption } from '../bundle/engine/story-director.js';
+import { chooseAutoPlayOption, compileNextBlueprintChapter } from '../bundle/engine/story-director.js';
+import { invokeAnnaLlm, formatDetailedError } from '../bundle/engine/anna-ai.js';
 import { getBgmIds, MAIN_MENU_BGM_ID } from '../bundle/assets/audio-catalog.js';
 import { syncSceneMusic } from '../bundle/ui/session-ai.js';
 
@@ -327,7 +328,32 @@ async function main() {
   assert.equal(bgmPlayed.at(-1), MAIN_MENU_BGM_ID, 'mode_select plays dedicated cop theme');
   syncSceneMusic(createInitialState({ phase: 'playing', scene: 'precinct_briefing' }), fakeAudio);
   assert.notEqual(bgmPlayed.at(-1), MAIN_MENU_BGM_ID, 'playing mode switches off menu theme');
-  console.log('   PASS: Cross-Tier Parity (Tier 2 1-by-1, Tier 1 Auto-Play & Main Menu Cop BGM isolation) verified.');
+
+  // Token version mismatch retries cleanly if auth.refresh updates runtime.token, and preserves story without dummy Ch.2 on failure
+  const staleErrInfo = formatDetailedError(Object.assign(new Error('token version mismatch'), { code: 'permission_denied' }), { stage: 'Compile Chapter 2' });
+  assert.match(staleErrInfo.summary, /reopen\/refresh/i);
+  const tokenRuntime = {
+    token: 't1',
+    llm: {
+      async *stream() {
+        if (tokenRuntime.token === 't1') {
+          setTimeout(() => { tokenRuntime.token = 't2'; }, 30);
+          throw Object.assign(new Error('token version mismatch'), { code: 'permission_denied' });
+        }
+        yield { event: 'model_token', text: '{"ok":true}' };
+        yield { event: 'complete' };
+      },
+    },
+  };
+  assert.equal(await invokeAnnaLlm(tokenRuntime, { systemPrompt: 'x', messages: [{ role: 'user', content: 'y' }] }), '{"ok":true}');
+  const failRt = { llm: { async *stream() { throw Object.assign(new Error('token version mismatch'), { code: 'permission_denied' }); } } };
+  const epSnap = saveStore.getTierActive(3) || sessEp?.getState?.();
+  if (epSnap?.aiCampaign) {
+    const preLen = epSnap.aiCampaign.chapters.length;
+    const failedNext = await compileNextBlueprintChapter({ anna: failRt, state: epSnap });
+    assert.ok(failedNext.error && failedNext.state.aiCampaign.chapters.length === preLen && failedNext.state.aiCampaign.awaitingNextChapter === true);
+  }
+  console.log('   PASS: Cross-Tier Parity (Tier 2 1-by-1, Tier 1 Auto-Play, Cop BGM & Token Refresh Guard) verified.');
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

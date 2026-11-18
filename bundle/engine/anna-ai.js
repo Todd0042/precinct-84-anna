@@ -13,11 +13,15 @@ export const MODEL_PRESETS = [
 
 export function formatDetailedError(err, meta = {}) {
   const e = err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
-  const summary = e.message || 'Unknown Anna AI / runtime error';
+  const rawMsg = e.message || 'Unknown Anna AI / runtime error';
+  const isTokenMismatch = /token version mismatch/i.test(rawMsg);
+  const summary = isTokenMismatch
+    ? 'Host session token rotated (app updated or idle tab). Your story & progress are saved — reopen/refresh Precinct 84 to get a fresh token, then Resume.'
+    : rawMsg;
   const headline = meta.stage ? `${meta.stage} Failed` : 'Anna AI Error';
   const payload = {
     name: e.name,
-    message: summary,
+    message: rawMsg,
     code: e.code ?? err?.code ?? null,
     status: e.status ?? err?.status ?? null,
     demoFlag: DEMO_VERBOSE_ERRORS,
@@ -159,41 +163,56 @@ export async function invokeAnnaLlm(
   let acc = '';
   let chunks = 0;
   let streamErr = null;
-  if (typeof anna.llm.stream === 'function') {
-    try {
-      const stream = anna.llm.stream(req);
-      for await (const ev of stream) {
-        if (ev?.event === 'model_token' && ev.text) {
-          acc += ev.text;
-          chunks += 1;
-          if (typeof onProgress === 'function') {
-            onProgress({ active: true, stage, selectedModel, chars: acc.length, chunks, elapsedMs: Date.now() - startedAt, phase: 'streaming' });
+  const isTokenErr = (e) => /token version mismatch/i.test(e?.message || '');
+
+  async function attemptCall(tokenSnapshot) {
+    acc = '';
+    streamErr = null;
+    if (typeof anna.llm.stream === 'function') {
+      try {
+        const stream = anna.llm.stream(req);
+        for await (const ev of stream) {
+          if (ev?.event === 'model_token' && ev.text) {
+            acc += ev.text;
+            chunks += 1;
+            if (typeof onProgress === 'function') {
+              onProgress({ active: true, stage, selectedModel, chars: acc.length, chunks, elapsedMs: Date.now() - startedAt, phase: 'streaming' });
+            }
+            if (typeof onToken === 'function') onToken(acc, ev.text);
+          } else if (ev?.event === 'complete' && ev.text && !acc) {
+            acc = ev.text;
+          } else if (ev?.event === 'error') {
+            streamErr = new Error(ev.message || ev.code || 'rt.llm.stream returned an error event');
+            streamErr.code = ev.code || 'STREAM_ERROR';
+            streamErr.rawEvent = ev;
           }
-          if (typeof onToken === 'function') onToken(acc, ev.text);
-        } else if (ev?.event === 'complete' && ev.text && !acc) {
-          acc = ev.text;
-        } else if (ev?.event === 'error') {
-          streamErr = new Error(ev.message || ev.code || 'rt.llm.stream returned an error event');
-          streamErr.code = ev.code || 'STREAM_ERROR';
-          streamErr.rawEvent = ev;
         }
+      } catch (err) {
+        streamErr = err instanceof Error ? err : new Error(String(err));
       }
-    } catch (err) {
-      streamErr = err instanceof Error ? err : new Error(String(err));
     }
+    if ((!acc || streamErr) && !isTokenErr(streamErr) && typeof anna.llm.complete === 'function') {
+      try {
+        if (typeof onProgress === 'function') {
+          onProgress({ active: true, stage: `${stage} (fallback)`, selectedModel, chars: acc.length, chunks, elapsedMs: Date.now() - startedAt, phase: 'completing' });
+        }
+        const res = await anna.llm.complete(req);
+        acc = res?.text || res?.content || acc;
+        if (acc) streamErr = null;
+      } catch (err) {
+        streamErr = err instanceof Error ? err : new Error(String(err));
+      }
+    }
+    if (streamErr && isTokenErr(streamErr)) {
+      await new Promise((r) => setTimeout(r, 350));
+      if (anna.token && anna.token !== tokenSnapshot) return false;
+    }
+    return true;
   }
 
-  if ((!acc || streamErr) && typeof anna.llm.complete === 'function') {
-    try {
-      if (typeof onProgress === 'function') {
-        onProgress({ active: true, stage: `${stage} (fallback)`, selectedModel, chars: acc.length, chunks, elapsedMs: Date.now() - startedAt, phase: 'completing' });
-      }
-      const res = await anna.llm.complete(req);
-      acc = res?.text || res?.content || acc;
-      if (acc) streamErr = null;
-    } catch (err) {
-      streamErr = err instanceof Error ? err : new Error(String(err));
-    }
+  const startToken = anna.token || null;
+  if (!(await attemptCall(startToken))) {
+    await attemptCall(anna.token || null);
   }
 
   const elapsedMs = Date.now() - startedAt;
