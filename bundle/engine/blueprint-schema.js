@@ -76,7 +76,7 @@ export function validateSingleIntermission(src = {}, key, fallbackSeed = {}, ass
     speakerId: snapCharacterId(src?.speakerId, defSpeaker, assetPool?.allCharacterIds),
     speakerMood: String(src?.speakerMood || 'calm'),
     lines: Array.isArray(src?.lines) && src.lines.length
-      ? src.lines.slice(0, 3).map((l) => sanitizeProseAssetIds(l))
+      ? src.lines.slice(0, 4).map((l) => sanitizeProseAssetIds(l))
       : ['Rain drums against the roof while Oakridge dispatch crackles over Channel 1.'],
     choices: actions,
   };

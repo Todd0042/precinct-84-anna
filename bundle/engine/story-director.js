@@ -32,7 +32,7 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
   const tier2Pool = selectTier2AssetPool();
   const fullMode = (next.storyGenMode || 'episodic') === 'full';
 
-  const theme = cleanStoryTheme(next.storyTheme);
+  const theme = cleanStoryTheme(next.tier2Script?._theme || next.storyTheme);
   if (!fullMode) {
     next.tier2Script = { _mode: 'episodic', _theme: theme, _assetPool: tier2Pool };
     addLog(next, out, 'SYSTEM', 'Tier 2 (1-by-1): each between-calls dramatization compiles when you reach it.');
@@ -51,8 +51,8 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
     `Allowed assets ONLY:\n${manifest}`,
     ...(themeLine ? [themeLine] : []),
     'Transitions: precinct_yard->crosswalk_redlight, interrogation_room->motel_exterior, motel_lab->pier84_exterior.',
-    'Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
-    'Return ONLY JSON: {"intermissions":[{"transitionKey":"...","title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","..."],"choices":[{"label":"...","command":"...","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}]}',
+    'Write 3 to 4 rich lines of dialogue/drama per intermission. Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
+    'Return ONLY JSON: {"intermissions":[{"transitionKey":"...","title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","...","..."],"choices":[{"label":"...","command":"...","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}]}',
   ].join('\n');
 
   let raw = '';
@@ -61,7 +61,7 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
       systemPrompt: sys,
       messages: [{ role: 'user', content: 'Compile a cohesive 3-intermission noir arc bridging Acts I->II, II->III, and III->IV.' }],
       selectedModel: next.aiModel,
-      maxTokens: 1600,
+      maxTokens: 2400,
       temperature: 0.72,
       stage: 'Compile Tier 2 Intermissions',
       onProgress,
@@ -83,7 +83,7 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
   const next = cloneState(state);
   const baseScript = next.tier2Script && typeof next.tier2Script === 'object' ? { ...next.tier2Script } : { _mode: 'episodic' };
   const pool = baseScript._assetPool || selectTier2AssetPool();
-  const theme = cleanStoryTheme(next.storyTheme || baseScript._theme);
+  const theme = cleanStoryTheme(baseScript._theme || next.storyTheme);
   baseScript._assetPool = pool;
   baseScript._theme = theme;
   const out = [];
@@ -94,11 +94,11 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
     const prior = Object.entries(baseScript).filter(([k]) => !k.startsWith('_')).map(([, v]) => v.title).join(' -> ');
     const themeLine = formatThemeDirective(theme);
     const sys = [
-      `Compile ONE "between calls" noir dramatization for Precinct 84 (${transitionKey}) featuring Marcus Mercer (#084) & Claire Bellamy (#089).`,
+      `Compile ONE rich "between calls" noir dramatization for Precinct 84 (${transitionKey}) featuring Marcus Mercer (#084) & Claire Bellamy (#089).`,
       formatChapterAssetPoolPrompt(pool),
       ...(themeLine ? [themeLine] : []),
       `Prior Intermissions: ${prior || 'None yet'} | Alignment: ${JSON.stringify(next.alignment || {})}`,
-      'Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
+      'Write 3 to 4 vivid lines of scene & dialogue. Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
     ].join('\n');
     let raw = '';
     try {
@@ -106,7 +106,7 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
         systemPrompt: sys,
         messages: [{ role: 'user', content: `Generate single between-calls scene for ${transitionKey}.` }],
         selectedModel: next.aiModel,
-        maxTokens: 700,
+        maxTokens: 1100,
         temperature: 0.72,
         stage: 'Compile Act Dramatization',
         onProgress,
@@ -135,7 +135,7 @@ function buildChapterCompilerSystemPrompt({ manifest, biblePrompt, includeCaseFi
     'You are the Precinct 84 Story Compiler. Generate ONE self-contained playable noir Chapter JSON using ONLY the asset IDs below.',
     manifest,
     biblePrompt,
-    'RULES: Strictly 3 to 4 linked beats (mix duty scenes with deviate/corrupt/rogue or bedroom/diner beats). Each beat has 2-3 actions. Keep each action "label" to 2-3 short words (max 20 chars) and "title" <= 48 chars. Use character display names in narrative/log prose, NEVER raw snake_case IDs. Set endChapter:true on the final beat.',
+    'RULES: Write 6 to 8 full linked beats pacing a complete investigative episode (crime scene -> witness/informant -> lab/clue -> bedroom/diner tension -> suspect confrontation -> climax). Each beat MUST have 2 to 3 vivid narrative/quoted-dialogue paragraphs and 2-3 branching choices with 1-2 sentence outcome "log" text. Keep action "label" to 2-3 short words (max 20 chars) and "title" <= 48 chars. Use character display names in prose, NEVER raw snake_case IDs. Set endChapter:true ONLY on the final beat.',
     `Return ONLY JSON: ${schema}`,
   ].join('\n');
 }
@@ -156,7 +156,7 @@ async function compileChapterWithOutline({ anna, campaignStub, chapterNum, align
       systemPrompt: sys,
       messages: [{ role: 'user', content: `Compile Chapter ${chapterNum}${isFinal ? ' (FINAL SHOWDOWN EPISODE)' : ''}: ${arcHint}` }],
       selectedModel,
-      maxTokens: 3200,
+      maxTokens: 6000,
       temperature: 0.72,
       stage,
       onProgress,
@@ -180,7 +180,7 @@ export async function compileNewAiCampaign({ anna, state, continuation = false, 
   const fullMode = (next.storyGenMode || 'episodic') === 'full';
   const assetPool = selectRandomStoryAssets();
 
-  const theme = cleanStoryTheme(next.storyTheme);
+  const theme = cleanStoryTheme(next.tier2Script?._theme || next.storyTheme);
   let outline = validateCaseOutline({ storyTheme: theme }, continuation, assetPool);
   let chapters = [];
   let lastErr = null;
@@ -197,7 +197,7 @@ export async function compileNewAiCampaign({ anna, state, continuation = false, 
           systemPrompt: sys,
           messages: [{ role: 'user', content: continuation ? 'Create episodic Chapter 1 of Case #84-002 sequel with Marcus Mercer (#084) & Claire Bellamy (#089).' : 'Create a gritty 1984 Oakridge noir episodic Chapter 1 with dirty-cop/rogue temptations and a sharp cliffhanger.' }],
           selectedModel: next.aiModel,
-          maxTokens: 3200,
+          maxTokens: 6000,
           temperature: 0.75,
           stage: 'Compile Episodic Ch.1',
           onProgress,

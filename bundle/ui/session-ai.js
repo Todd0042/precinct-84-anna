@@ -41,7 +41,7 @@ export function replayExistingStory(prev) {
     aiTier: prev.aiTier || 1,
     aiModel: prev.aiModel || 'preset:default',
     storyGenMode: prev.storyGenMode || 'episodic',
-    storyTheme: prev.storyTheme || '',
+    storyTheme: prev.aiCampaign?.outline?.storyTheme || prev.tier2Script?._theme || prev.storyTheme || '',
     llmAvailable: Boolean(prev.llmAvailable),
   });
   if (prev.storyId) fresh.storyId = prev.storyId;
@@ -160,7 +160,8 @@ export function createAiTaskRunner({ anna, audio, saveStore, storyLib, getState,
   }
 
   function activateSavedTier(saved, tier, modelOverride) {
-    const resumed = { ...saved, phase: 'playing', aiModel: modelOverride || saved.aiModel };
+    const storyTheme = saved.aiCampaign?.outline?.storyTheme || saved.tier2Script?._theme || saved.storyTheme || '';
+    const resumed = { ...saved, phase: 'playing', storyTheme, aiModel: modelOverride || saved.aiModel };
     resumed.log = [...resumed.log, { tag: 'SYSTEM', text: `Resumed saved Tier ${tier} shift.` }];
     setState(resumed);
     syncSceneMusic(resumed, audio);

@@ -39,9 +39,11 @@ export function buildStoryEntryFromState(state, existingId = null) {
 }
 
 export function buildPlayableStateFromEntry(entry, { resumeProgress = true, llmAvailable = false } = {}) {
+  const storyTheme = entry?.aiCampaign?.outline?.storyTheme || entry?.tier2Script?._theme || entry?.snapshot?.storyTheme || '';
   if (resumeProgress && entry?.snapshot && typeof entry.snapshot.scene === 'string') {
     return JSON.parse(JSON.stringify({
       ...entry.snapshot,
+      storyTheme,
       tier2Script: entry.tier2Script || entry.snapshot.tier2Script || null,
       aiCampaign: entry.aiCampaign || entry.snapshot.aiCampaign || null,
       storyId: entry.id,
@@ -54,6 +56,7 @@ export function buildPlayableStateFromEntry(entry, { resumeProgress = true, llmA
     phase: 'playing',
     aiTier: entry.tier || 3,
     aiModel: entry.aiModel || 'preset:default',
+    storyTheme,
     llmAvailable,
   });
   fresh.storyId = entry.id;
