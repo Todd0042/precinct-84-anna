@@ -4,6 +4,7 @@ import { createAudioEngine } from '../engine/audio.js';
 import { MODEL_PRESETS } from '../engine/anna-ai.js';
 import { buildScreenFrame, HIGHRES_COLS, HIGHRES_ROWS } from './layout.js';
 import { createAiTaskRunner, buildShiftResetState, hasGeneratedStory, replayExistingStory, syncSceneMusic } from './session-ai.js';
+import { defaultStageDirector } from '../gfx/stage-director.js';
 
 export function createXtermTuiSession({
   term,
@@ -345,6 +346,7 @@ export function createXtermTuiSession({
   const timer = tickIntervalMs && tickIntervalMs > 0
     ? setInterval(() => {
         tick = (tick + 1) % 10000;
+        if (state.phase === 'playing') defaultStageDirector.step(tickIntervalMs, (sfx) => audio.play(sfx));
         render();
         if (typeof onTick === 'function') onTick(tick, state);
       }, tickIntervalMs)

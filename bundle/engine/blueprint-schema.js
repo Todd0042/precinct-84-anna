@@ -3,6 +3,13 @@ import { CHARACTER_CATALOG } from '../assets/character-catalog.js';
 import { BGM_CATALOG, getBgmIds, CORE_SFX_LIST } from '../assets/audio-catalog.js';
 import { selectRandomStoryAssets, formatChapterAssetPoolPrompt } from './asset-selector.js';
 import { sanitizeProseAssetIds, cleanWordLabel, cleanStoryTheme } from './story-bible.js';
+import {
+  normalizeStageActors,
+  normalizeStageProps,
+  normalizeTimeline,
+  normalizeActionTimeline,
+  normalizeActionConsequence,
+} from './screenplay-normalizer.js';
 
 const SCENE_IDS = getSceneIds();
 const CHAR_IDS = Object.keys(CHARACTER_CATALOG);
@@ -67,17 +74,27 @@ export function validateSingleIntermission(src = {}, key, fallbackSeed = {}, ass
         { label: 'Keep It By The Book', command: 'follow code', reply: 'Claire taps the cruiser dash: "Clean call, Marcus."', alignmentDelta: { byTheBook: 2, corruption: 0, rogue: 0 } },
         { label: 'Bend The Rules', command: 'bend rules', reply: 'Marcus lowers his eyes: "Whatever closes the case tonight."', alignmentDelta: { byTheBook: 0, corruption: 1, rogue: 2 } },
       ];
+  const sceneId = snapSceneId(src?.sceneId, defScene, assetPool?.allSceneIds);
+  const speakerId = snapCharacterId(src?.speakerId, defSpeaker, assetPool?.allCharacterIds);
+  const speakerMood = String(src?.speakerMood || 'calm');
+  const cleanLines = Array.isArray(src?.lines) && src.lines.length
+    ? src.lines.slice(0, 4).map((l) => sanitizeProseAssetIds(l))
+    : ['Rain drums against the roof while Oakridge dispatch crackles over Channel 1.'];
+  const actors = normalizeStageActors(src?.actors, sceneId, cleanLines, assetPool?.allCharacterIds, speakerId);
+  const stageProps = normalizeStageProps(src?.stageProps || src?.props, sceneId, cleanLines);
+  const timeline = normalizeTimeline(src?.timeline, actors, stageProps, cleanLines, speakerId, speakerMood);
   return {
     transitionKey: key,
     title: cleanWordLabel(src?.title || fallbackSeed[key]?.title || 'BETWEEN CALLS DRAMATIZATION', 56),
-    sceneId: snapSceneId(src?.sceneId, defScene, assetPool?.allSceneIds),
+    sceneId,
     bgmId: snapBgmId(src?.bgmId, defBgm, assetPool?.bgm),
     sfxId: snapSfxId(src?.sfxId, 'squelch'),
-    speakerId: snapCharacterId(src?.speakerId, defSpeaker, assetPool?.allCharacterIds),
-    speakerMood: String(src?.speakerMood || 'calm'),
-    lines: Array.isArray(src?.lines) && src.lines.length
-      ? src.lines.slice(0, 4).map((l) => sanitizeProseAssetIds(l))
-      : ['Rain drums against the roof while Oakridge dispatch crackles over Channel 1.'],
+    speakerId,
+    speakerMood,
+    actors,
+    stageProps,
+    timeline,
+    lines: cleanLines,
     choices: actions,
   };
 }
@@ -184,21 +201,27 @@ export function validateChapterBlueprint(raw, chapterNum = 1, isFinalChapter = f
     ];
     const sceneId = snapSceneId(b?.sceneId, poolScenes?.[i % poolScenes.length] || 'precinct_briefing', poolScenes);
     const defaultBgm = SCENE_CATALOG[sceneId]?.bgm || poolBgm?.[0] || 'bgm_precinct_rain';
+    const speakerId = snapCharacterId(b?.speakerId, 'claire', poolChars);
+    const speakerMood = String(b?.speakerMood || 'calm');
+    const cleanNarrative = Array.isArray(b?.narrative) && b.narrative.length
+      ? b.narrative.map((l) => sanitizeProseAssetIds(l))
+      : ['The night deepens across Oakridge Harbor.'];
+    const actors = normalizeStageActors(b?.actors, sceneId, cleanNarrative, poolChars, speakerId);
+    const stageProps = normalizeStageProps(b?.stageProps || b?.props, sceneId, cleanNarrative);
+    const timeline = normalizeTimeline(b?.timeline, actors, stageProps, cleanNarrative, speakerId, speakerMood);
     beats[id] = {
       id,
       sceneId,
       bgmId: snapBgmId(b?.bgmId, defaultBgm, poolBgm),
       sfxId: snapSfxId(b?.sfxId, 'tick'),
-      speakerId: snapCharacterId(b?.speakerId, 'claire', poolChars),
-      speakerMood: String(b?.speakerMood || 'calm'),
+      speakerId,
+      speakerMood,
       weather: b?.weather || null,
-      props: Array.isArray(b?.props) ? b.props.map(String) : [],
-      actors: Array.isArray(b?.actors) && b.actors.length
-        ? b.actors.slice(0, 4).map((a) => ({ id: snapCharacterId(a?.id || a, 'marcus', poolChars), pose: a?.pose || 'stand' }))
-        : [{ id: 'marcus', pose: 'stand' }, { id: 'claire', pose: 'stand' }],
-      narrative: Array.isArray(b?.narrative) && b.narrative.length
-        ? b.narrative.map((l) => sanitizeProseAssetIds(l))
-        : ['The night deepens across Oakridge Harbor.'],
+      props: Array.isArray(b?.props) ? b.props.map((p) => (typeof p === 'object' ? p?.id || 'evidence_marker' : String(p))) : [],
+      stageProps,
+      actors,
+      timeline,
+      narrative: cleanNarrative,
       objectives: Array.isArray(b?.objectives) && b.objectives.length
         ? b.objectives.map((o) => sanitizeProseAssetIds(o))
         : ['Follow the active lead'],
@@ -219,6 +242,8 @@ export function validateChapterBlueprint(raw, chapterNum = 1, isFinalChapter = f
         },
         sfx: snapSfxId(a?.sfx, 'point'),
         log: sanitizeProseAssetIds(a?.log || 'You act decisively and update your case pad.'),
+        timeline: normalizeActionTimeline(a, actors),
+        consequence: normalizeActionConsequence(a, actors),
       })),
     };
   });

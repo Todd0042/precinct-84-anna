@@ -51,8 +51,8 @@ export async function compileTier2Intermissions({ anna, state, onProgress = null
     `Allowed assets ONLY:\n${manifest}`,
     ...(themeLine ? [themeLine] : []),
     'Transitions: precinct_yard->crosswalk_redlight, interrogation_room->motel_exterior, motel_lab->pier84_exterior.',
-    'Write 3 to 4 rich lines of dialogue/drama per intermission. Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
-    'Return ONLY JSON: {"intermissions":[{"transitionKey":"...","title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","...","..."],"choices":[{"label":"...","command":"...","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}]}',
+    'Write 3 to 4 rich lines of dialogue/drama per intermission with stage blocking ("actors", optional "timeline" cues: move/pickup/speak/fire). Keep choice labels 2-3 short words (<=20 chars); use display names never snake_case IDs in prose.',
+    'Return ONLY JSON: {"intermissions":[{"transitionKey":"...","title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","actors":[{"id":"...","outfit":"police_uniform|bad_guy|casual|formal|naked","prop":"cigarette|coffee_cup|whiskey_glass|pistol|...","pose":"stand|chill|sit|lie_bed|smoke|aim","at":"booth_left|bed_left|center|doorway"}],"timeline":[{"type":"move|pickup|speak|fire","actorId":"...","speakerId":"...","prop":"...","line":"..."}],"lines":["...","...","..."],"choices":[{"label":"...","command":"...","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}]}',
   ].join('\n');
 
   let raw = '';
@@ -98,7 +98,7 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
       formatChapterAssetPoolPrompt(pool),
       ...(themeLine ? [themeLine] : []),
       `Prior Intermissions: ${prior || 'None yet'} | Alignment: ${JSON.stringify(next.alignment || {})}`,
-      'Write 3 to 4 vivid lines of scene & dialogue. Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","lines":["...","...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
+      'Write 3 to 4 vivid lines of scene & dialogue with visual-novel blocking ("actors" w/ outfit/prop/pose/at + optional "timeline" cues: move/pickup/speak/fire). Return ONLY JSON: {"title":"...","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|nervous|angry|flirt","actors":[{"id":"...","outfit":"casual|formal|naked|police_uniform|bad_guy","prop":"cigarette|coffee_cup|whiskey_glass|pistol","pose":"chill|sit|lie_bed|smoke|stand","at":"booth_left|bed_left|doorway|center"}],"timeline":[{"type":"speak","speakerId":"...","line":"..."}],"lines":["...","...","..."],"choices":[{"label":"Short Label","command":"cmd","reply":"...","byTheBook":0,"corruption":0,"rogue":0}]}',
     ].join('\n');
     let raw = '';
     try {
@@ -128,14 +128,15 @@ export async function compileSingleTier2Intermission({ anna, state, transitionKe
 }
 
 function buildChapterCompilerSystemPrompt({ manifest, biblePrompt, includeCaseFields = false }) {
+  const beatShape = '{"id":"beat_1","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|angry|nervous|flirt","actors":[{"id":"...","outfit":"police_uniform|bad_guy|casual|formal|naked","prop":"cigarette|coffee_cup|pistol|...","pose":"stand|walk|chill|sit|lie_bed|bend_pickup|aim|shoot|kneel|down","at":"bed_left|booth_left|doorway|center|cover_left"}],"stageProps":[{"id":"evidence_bag|shell_casings|rossi_box","at":"evidence_spot"}],"timeline":[{"type":"move|pickup|speak|fire","actorId":"...","at":"...","prop":"...","speakerId":"...","line":"...","shooterId":"...","targetId":"...","weapon":"pistol|shotgun","outcome":"miss|graze|wounded_leg|fatal"}],"narrative":["..."],"objectives":["..."],"actions":[{"label":"Bag Ledger","command":"bag_ledger","nextBeatId":"beat_2","endChapter":false,"isVictory":false,"scoreDelta":10,"alignmentDelta":{"byTheBook":1,"corruption":0,"rogue":0},"consequence":{"targetId":"...","status":"intact|grazed|wounded_arm|wounded_leg|hospitalized|dead"},"sfx":"point","log":"..."}]}';
   const schema = includeCaseFields
-    ? '{"caseTitle":"...","culpritId":"...","motive":"...","twist":"...","title":"Ch.1: ...","beats":[{"id":"beat_1","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|angry|nervous|flirt","actors":[{"id":"...","pose":"stand|aim|kneel|run|handsup"}],"narrative":["..."],"objectives":["..."],"actions":[{"label":"Bag Ledger","command":"bag_ledger","nextBeatId":"beat_2","endChapter":false,"isVictory":false,"scoreDelta":10,"alignmentDelta":{"byTheBook":1,"corruption":0,"rogue":0},"sfx":"point","log":"..."}]}]}'
-    : '{"title":"...","beats":[{"id":"beat_1","sceneId":"...","bgmId":"...","sfxId":"...","speakerId":"...","speakerMood":"calm|smirk|angry|nervous|flirt","actors":[{"id":"...","pose":"stand|aim|kneel|run|handsup"}],"narrative":["..."],"objectives":["..."],"actions":[{"label":"Bag Ledger","command":"bag_ledger","nextBeatId":"beat_2","endChapter":false,"isVictory":false,"scoreDelta":10,"alignmentDelta":{"byTheBook":1,"corruption":0,"rogue":0},"sfx":"point","log":"..."}]}]}';
+    ? `{"caseTitle":"...","culpritId":"...","motive":"...","twist":"...","title":"Ch.1: ...","beats":[${beatShape}]}`
+    : `{"title":"...","beats":[${beatShape}]}`;
   return [
-    'You are the Precinct 84 Story Compiler. Generate ONE self-contained playable noir Chapter JSON using ONLY the asset IDs below.',
+    'You are the Precinct 84 Screenplay & Story Compiler. Direct ONE playable visual-novel noir Chapter JSON using ONLY the asset IDs below.',
     manifest,
     biblePrompt,
-    'RULES: Write 6 to 8 full linked beats pacing a complete investigative episode (crime scene -> witness/informant -> lab/clue -> bedroom/diner tension -> suspect confrontation -> climax). Each beat MUST have 2 to 3 vivid narrative/quoted-dialogue paragraphs and 2-3 branching choices with 1-2 sentence outcome "log" text. Keep action "label" to 2-3 short words (max 20 chars) and "title" <= 48 chars. Use character display names in prose, NEVER raw snake_case IDs. Set endChapter:true ONLY on the final beat.',
+    'RULES: Write 6 to 8 full linked beats pacing a complete investigative episode (crime scene -> witness/informant -> lab/clue -> bedroom/diner tension -> suspect confrontation -> climax). Direct every beat like a screenplay: block actors w/ outfit, prop, pose, landmark, stageProps, and timeline cues (move, pickup, speak, fire). Realistic Zero-HP Rule: NEVER mention health bars/HP; gunshots cause realistic injuries (wounded_leg/hospitalized) or death (fatal/dead). Keep each beat to 2-3 vivid narrative paragraphs, 2-3 choices, action "label" <= 20 chars, "title" <= 48 chars, display names in prose. Set endChapter:true ONLY on final beat.',
     `Return ONLY JSON: ${schema}`,
   ].join('\n');
 }

@@ -51,6 +51,32 @@ export function summarizeChapterOutcome(chapter, chIdx, awarded = {}) {
   return `${title}: ${tail}`;
 }
 
+export function createInitialStoryState() {
+  return { casualties: [], injuries: {}, outfits: {}, props: {} };
+}
+
+export function recordStoryConsequence(storyState, consequence) {
+  const st = storyState && typeof storyState === 'object' ? storyState : createInitialStoryState();
+  if (!Array.isArray(st.casualties)) st.casualties = [];
+  if (!st.injuries || typeof st.injuries !== 'object') st.injuries = {};
+  if (!st.outfits || typeof st.outfits !== 'object') st.outfits = {};
+  if (!st.props || typeof st.props !== 'object') st.props = {};
+  if (!consequence || typeof consequence !== 'object') return st;
+
+  const tid = consequence.targetId ? String(consequence.targetId) : null;
+  if (tid) {
+    if (consequence.status === 'dead' && tid !== 'marcus') {
+      if (!st.casualties.includes(tid)) st.casualties.push(tid);
+      delete st.injuries[tid];
+    } else if (consequence.status && consequence.status !== 'intact') {
+      st.injuries[tid] = String(consequence.status);
+    }
+    if (consequence.outfit) st.outfits[tid] = String(consequence.outfit);
+    if (consequence.prop !== undefined) st.props[tid] = consequence.prop;
+  }
+  return st;
+}
+
 export function buildStoryBiblePrompt(aiCampaign, alignment = {}, awarded = {}) {
   const outline = aiCampaign?.outline || {};
   const culprit = CHARACTER_CATALOG[outline.culpritId];
@@ -58,6 +84,9 @@ export function buildStoryBiblePrompt(aiCampaign, alignment = {}, awarded = {}) 
   const chapters = Array.isArray(aiCampaign?.chapters) ? aiCampaign.chapters : [];
   const recaps = chapters.map((ch, idx) => `- ${summarizeChapterOutcome(ch, idx, awarded)}`);
   const align = alignment || { byTheBook: 0, corruption: 0, rogue: 0 };
+  const storyState = aiCampaign?.storyState || {};
+  const casualties = Array.isArray(storyState.casualties) ? storyState.casualties : [];
+  const injuries = Object.entries(storyState.injuries || {});
 
   const themeLine = formatThemeDirective(outline.storyTheme);
   return [
@@ -68,7 +97,9 @@ export function buildStoryBiblePrompt(aiCampaign, alignment = {}, awarded = {}) 
     ...(themeLine ? [`- ${themeLine}`] : []),
     `- Lead Officers: Officer Marcus Mercer (#084) & Officer Claire Bellamy (#089)`,
     `- Player Alignment: byTheBook=${align.byTheBook || 0}, corruption=${align.corruption || 0}, rogue=${align.rogue || 0}`,
+    ...(casualties.length ? [`- Casualties (DECEASED — NEVER REAPPEAR ALIVE): ${casualties.map((id) => CHARACTER_CATALOG[id]?.name || id).join(', ')}`] : []),
+    ...(injuries.length ? [`- Active Wounds / Hospitalizations (ZERO HP — REALISTIC INJURIES): ${injuries.map(([id, st]) => `${CHARACTER_CATALOG[id]?.name || id}=${st}`).join(', ')}`] : []),
     recaps.length ? `- Prior Chapters & Player Choices:\n${recaps.join('\n')}` : '- Opening Episode: Start directly in Chapter 1.',
-    'STRICT RULE: Never rename Marcus Mercer/Claire Bellamy, never write snake_case IDs in prose, and continue faithfully from prior outcomes/arrests.',
+    'STRICT RULE: Never rename Marcus Mercer/Claire Bellamy, never write snake_case IDs in prose, never use health bars/HP, and continue faithfully from prior casualties/wounds/arrests.',
   ].join('\n');
 }

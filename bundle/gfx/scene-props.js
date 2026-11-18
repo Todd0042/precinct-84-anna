@@ -1,4 +1,5 @@
 import { PAL } from './svga-palette.js';
+export { drawHeldProp } from './held-props.js';
 
 export function drawSvgaLightbar(ctx, x, y, width, tick) {
   const half = width / 2;
@@ -164,79 +165,152 @@ export function drawSvgaMonteCarlo(ctx, x, y, wrecked = false, tick = 0) {
   ctx.restore();
 }
 
-export function drawPropLayer(ctx, propId, tick = 0, state = {}) {
+export function drawPropLayer(ctx, propInput, tick = 0, state = {}) {
+  const isObj = propInput && typeof propInput === 'object';
+  const propId = isObj ? propInput.id : String(propInput || '');
+  const px = isObj && typeof propInput.x === 'number' ? propInput.x : null;
+  const py = isObj && typeof propInput.y === 'number' ? propInput.y : null;
+
   if (propId === 'police_tape') {
+    const ty = py ?? 224;
     ctx.fillStyle = PAL.AMBER;
-    ctx.fillRect(0, 224, 480, 7);
+    ctx.fillRect(0, ty, 480, 7);
     ctx.fillStyle = '#101218';
-    for (let x = 0; x < 480; x += 28) ctx.fillRect(x, 224, 12, 7);
+    for (let x = 0; x < 480; x += 28) ctx.fillRect(x, ty, 12, 7);
     ctx.font = 'bold 6px monospace';
-    for (let x = 14; x < 460; x += 84) ctx.fillText('POLICE LINE', x, 230);
+    for (let x = 14; x < 460; x += 84) ctx.fillText('POLICE LINE', x, ty + 6);
   } else if (propId === 'cash_briefcase') {
+    const x = px ?? 202;
+    const y = py ?? 162;
     ctx.fillStyle = '#382214';
-    ctx.fillRect(202, 162, 58, 24);
+    ctx.fillRect(x, y, 58, 24);
     ctx.fillStyle = '#246838';
-    ctx.fillRect(206, 165, 22, 14);
-    ctx.fillRect(232, 165, 22, 14);
+    ctx.fillRect(x + 4, y + 3, 22, 14);
+    ctx.fillRect(x + 30, y + 3, 22, 14);
     ctx.strokeStyle = PAL.GOLD_BADGE;
-    ctx.strokeRect(202, 162, 58, 24);
+    ctx.strokeRect(x, y, 58, 24);
   } else if (propId === 'whiskey_glasses') {
-    for (const gx of [172, 186]) {
+    const base = px ?? 172;
+    const y = py ?? 168;
+    for (const gx of [base, base + 14]) {
       ctx.fillStyle = 'rgba(220, 235, 250, 0.35)';
-      ctx.fillRect(gx, 168, 9, 12);
+      ctx.fillRect(gx, y, 9, 12);
       ctx.fillStyle = PAL.AMBER;
-      ctx.fillRect(gx + 1, 174, 7, 5);
+      ctx.fillRect(gx + 1, y + 6, 7, 5);
     }
   } else if (propId === 'rossi_box') {
+    const x = px ?? 142;
+    const y = py ?? 166;
     ctx.fillStyle = '#f2efe8';
-    ctx.fillRect(142, 166, 28, 16);
+    ctx.fillRect(x, y, 28, 16);
     ctx.strokeStyle = PAL.RED_STROBE;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(142, 174);
-    ctx.lineTo(170, 174);
-    ctx.moveTo(156, 166);
-    ctx.lineTo(156, 182);
+    ctx.moveTo(x, y + 8);
+    ctx.lineTo(x + 28, y + 8);
+    ctx.moveTo(x + 14, y);
+    ctx.lineTo(x + 14, y + 16);
     ctx.stroke();
-  } else if (propId === 'incinerator_fire') {
-    ctx.fillStyle = '#181b22';
-    ctx.fillRect(365, 138, 62, 92);
+  } else if (propId === 'incinerator_fire' || propId === 'burn_barrel') {
+    const x = px ?? 365;
+    const y = py ?? 138;
+    ctx.fillStyle = propId === 'burn_barrel' ? '#2c221e' : '#181b22';
+    ctx.fillRect(x, y, propId === 'burn_barrel' ? 32 : 62, propId === 'burn_barrel' ? 44 : 92);
     const flicker = (tick % 3) * 4;
     ctx.fillStyle = PAL.FIRE_ORANGE;
     ctx.beginPath();
-    ctx.moveTo(372, 138);
-    ctx.lineTo(386, 94 - flicker);
-    ctx.lineTo(398, 118);
-    ctx.lineTo(412, 90 + flicker);
-    ctx.lineTo(422, 138);
+    ctx.moveTo(x + 5, y);
+    ctx.lineTo(x + 16, y - 34 - flicker);
+    ctx.lineTo(x + 28, y - 16);
+    ctx.lineTo(x + 42, y - 36 + flicker);
+    ctx.lineTo(x + (propId === 'burn_barrel' ? 28 : 54), y);
     ctx.closePath();
     ctx.fill();
     ctx.fillStyle = PAL.FLAME_YELLOW;
-    ctx.beginPath();
-    ctx.moveTo(382, 138);
-    ctx.lineTo(397, 108 - flicker);
-    ctx.lineTo(414, 138);
-    ctx.closePath();
-    ctx.fill();
+    ctx.fillRect(x + 12, y - 18 - flicker * 0.5, 12, 18);
   } else if (propId === 'red_twine_clue') {
+    const x = px ?? 220;
+    const y = py ?? 245;
     ctx.strokeStyle = PAL.RED_STROBE;
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(220, 245);
-    ctx.quadraticCurveTo(234, 240, 246, 248);
+    ctx.moveTo(x, y);
+    ctx.quadraticCurveTo(x + 14, y - 5, x + 26, y + 3);
     ctx.stroke();
-  } else if (propId === 'tape_recorder') {
+  } else if (propId === 'tape_recorder' || propId === 'wiretap_deck') {
+    const x = px ?? 184;
+    const y = py ?? 152;
     ctx.fillStyle = '#141822';
-    ctx.fillRect(184, 152, 46, 24);
+    ctx.fillRect(x, y, 46, 24);
     ctx.strokeStyle = PAL.STEEL_LIT;
-    ctx.strokeRect(184, 152, 46, 24);
-    for (const rx of [197, 217]) {
+    ctx.strokeRect(x, y, 46, 24);
+    for (const rx of [x + 13, x + 33]) {
       ctx.fillStyle = PAL.CHROME;
       ctx.beginPath();
-      ctx.arc(rx, 164, 6, 0, Math.PI * 2);
+      ctx.arc(rx, y + 12, 6, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.fillStyle = state.flags?.recorderOn && tick % 2 === 0 ? PAL.RED_STROBE : PAL.RED_DEEP;
-    ctx.fillRect(223, 155, 4, 4);
+    ctx.fillRect(x + 39, y + 3, 4, 4);
+  } else {
+    drawExtendedStageProp(ctx, propId, px ?? 244, py ?? 240, tick);
+  }
+}
+
+function drawExtendedStageProp(ctx, propId, x, y, tick) {
+  if (propId === 'shell_casings') {
+    ctx.fillStyle = PAL.GOLD_BADGE;
+    for (const [dx, dy] of [[-8, 2], [-1, 5], [7, 1], [12, 4]]) ctx.fillRect(x + dx, y + dy, 4, 1.8);
+  } else if (propId === 'blood_stain') {
+    ctx.fillStyle = '#4e0a12';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 2, 16, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (propId === 'chalk_outline') {
+    ctx.strokeStyle = '#e8ecf4';
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(x - 18, y - 5, 36, 12);
+    ctx.beginPath();
+    ctx.arc(x - 22, y + 1, 5, 0, Math.PI * 2);
+    ctx.stroke();
+  } else if (propId === 'evidence_marker' || propId === 'barricade_cone') {
+    ctx.fillStyle = propId === 'barricade_cone' ? PAL.FIRE_ORANGE : PAL.AMBER;
+    ctx.beginPath();
+    ctx.moveTo(x - 5, y + 4);
+    ctx.lineTo(x, y - 8);
+    ctx.lineTo(x + 5, y + 4);
+    ctx.closePath();
+    ctx.fill();
+  } else if (propId === 'broken_glass') {
+    ctx.fillStyle = 'rgba(180, 224, 255, 0.58)';
+    for (const dx of [-8, -2, 4, 9]) ctx.fillRect(x + dx, y + (dx % 3), 4, 2.5);
+  } else if (propId === 'cigarette_butt') {
+    ctx.fillStyle = '#eee8df';
+    ctx.fillRect(x - 3, y, 6, 2);
+    ctx.fillStyle = tick % 4 < 2 ? PAL.FIRE_ORANGE : '#585858';
+    ctx.fillRect(x + 3, y, 2, 2);
+  } else if (propId === 'dropped_pistol') {
+    ctx.fillStyle = PAL.STEEL_LIT;
+    ctx.fillRect(x - 6, y, 11, 3);
+    ctx.fillStyle = '#181a22';
+    ctx.fillRect(x - 6, y + 2, 4, 5);
+  } else if (propId === 'evidence_bag' || propId === 'case_dossier' || propId === 'syringe_vial' || propId === 'motel_key') {
+    ctx.fillStyle = propId === 'case_dossier' ? '#b89464' : propId === 'motel_key' ? PAL.GOLD_BADGE : 'rgba(185,235,255,0.55)';
+    ctx.fillRect(x - 6, y - 4, 12, 8);
+    ctx.strokeStyle = PAL.NEON_CYAN;
+    ctx.strokeRect(x - 6, y - 4, 12, 8);
+  } else if (propId === 'coffee_mug') {
+    ctx.fillStyle = '#ece8df';
+    ctx.fillRect(x - 4, y - 6, 8, 8);
+  } else if (propId === 'open_safe') {
+    ctx.fillStyle = PAL.STEEL_DARK;
+    ctx.fillRect(x - 16, y - 24, 32, 26);
+    ctx.fillStyle = '#07090e';
+    ctx.fillRect(x - 12, y - 20, 24, 18);
+  } else if (propId === 'corpse_sheet') {
+    ctx.fillStyle = '#d4d8e2';
+    ctx.beginPath();
+    ctx.ellipse(x, y - 4, 24, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
   }
 }

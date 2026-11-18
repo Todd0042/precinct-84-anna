@@ -1,4 +1,5 @@
 import { addLog, award, cloneState, makeSnapshot, triggerFail, MAX_UNDO_DEPTH } from '../game/state.js';
+import { createInitialStoryState, recordStoryConsequence } from './story-bible.js';
 
 function applyAlignment(state, delta = {}) {
   const cur = state.alignment || { byTheBook: 0, corruption: 0, rogue: 0 };
@@ -21,7 +22,9 @@ export function enterBlueprintBeat(next, beat, out) {
   if (!beat) return;
   next.scene = beat.sceneId;
   next.objectives = beat.objectives.slice();
+  if (!next.aiCampaign.storyState) next.aiCampaign.storyState = createInitialStoryState();
   next.aiCampaign.currentBeatId = beat.id;
+  next.lastActionTimeline = null;
   const chNum = next.aiCampaign.chapters?.[next.aiCampaign.chapterIdx]?.chapterNumber || 1;
   addLog(next, out, 'SCENE', `--- CH.${chNum}: ${beat.sceneId.replace(/_/g, ' ').toUpperCase()} ---`);
   for (const line of beat.narrative) addLog(next, out, 'NARRATIVE', line);
@@ -78,6 +81,25 @@ export function executeBlueprintTurn(prevState, rawInput) {
   if (action.failCitation) {
     triggerFail(next, out, 'PROCEDURAL VIOLATION', action.failCitation, action.failReason || 'Tactical breach of department rules.');
     return { state: next, sfx: 'gameover' };
+  }
+
+  if (!next.aiCampaign.storyState) next.aiCampaign.storyState = createInitialStoryState();
+  if (Array.isArray(action.timeline) && action.timeline.length) {
+    next.lastActionTimeline = action.timeline;
+    next.lastActionTimelineId = `act_${next.turn}`;
+  } else {
+    next.lastActionTimeline = null;
+  }
+  if (action.consequence) {
+    recordStoryConsequence(next.aiCampaign.storyState, action.consequence);
+    if (action.consequence.targetId === 'marcus' && action.consequence.status === 'dead') {
+      addLog(next, out, 'ACTION', action.log);
+      triggerFail(next, out, 'FATAL INCIDENT', '10-99 OFFICER KILLED IN ACTION', action.failReason || action.log || 'Fatal gunshot wound in the line of duty.');
+      return { state: next, sfx: 'shot' };
+    }
+    if (['hospitalized', 'wounded_leg', 'wounded_arm'].includes(action.consequence.status)) {
+      addLog(next, out, 'ALERT', `[MEDICAL / TRAUMA] Physical injury (${action.consequence.status.replace(/_/g, ' ')}) recorded — no arcade health bars; wound persists in case file.`);
+    }
   }
 
   applyAlignment(next, action.alignmentDelta);

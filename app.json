@@ -1,7 +1,7 @@
 {
   "slug": "precinct-84-anna",
   "name": "Precinct 84: Case I — Blue Velvet",
-  "version": "0.4.17",
+  "version": "0.4.18",
   "tagline": "Code-drawn 480x270 SVGA detective adventure with compiled AI campaigns & 300+ assets",
   "description": "An illustrated 1990s Sierra-inspired 480x270 SVGA & xterm.js detective adventure for Anna OS featuring anatomical characters, 96x96 expressive portraits, 300+ scenes/cast/AdLib BGM/SFX assets, compiled JSON campaign blueprints supporting Good Cop / Dirty Cop / Rogue branches, isolated per-tier APS KV saves, and replay-vs-regenerate reset choices.",
   "category": "entertainment"

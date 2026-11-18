@@ -1,4 +1,6 @@
 import { PAL, SKIN_RAMPS, HAIR_TONES, hexAlpha } from './svga-palette.js';
+import { resolveOutfitSpec } from '../assets/outfit-prop-catalog.js';
+import { drawHeldProp } from './scene-props.js';
 
 function drawRoundedLimb(ctx, x0, y0, x1, y1, width, color) {
   ctx.strokeStyle = color;
@@ -130,32 +132,48 @@ function drawDetailedHead(ctx, cx, cy, spec, facing = 1, rimColor = null) {
 }
 
 /**
- * Renders a proportional multi-joint character anchored at foot ground `(x, y)`.
+ * Renders a proportional multi-joint character anchored at `(x, y)` supporting outfits,
+ * 30+ held props, wounds, and full articulated poses (walk, chill, sit, lie_bed, bend_pickup, shoot, down).
  */
 export function drawAnatomicalActor(ctx, x, y, spec = {}, opts = {}) {
   const scale = opts.scale || 1;
   const pose = opts.pose || 'stand';
-  const facing = opts.facing || 1;
+  const facing = opts.facing >= 0 ? 1 : -1;
   const tick = opts.tick || 0;
   const slim = spec.slim ? 0.86 : 1;
+  const outfit = resolveOutfitSpec(spec, opts.outfit || spec.outfit || 'default');
+  const prop = opts.prop || spec.prop || (opts.rossiBox ? 'rossi_box' : null);
+  const [skin, skinShade] = SKIN_RAMPS[spec.skin || 'fair'] || SKIN_RAMPS.fair;
+
+  const coat = outfit.isNaked ? skin : outfit.attireColor;
+  const coatShade = outfit.isNaked ? skinShade : outfit.attireShade;
+  const pants = outfit.isNaked ? skin : outfit.pantsColor;
+  const hipY = pose === 'kneel' || pose === 'crouch' ? -16 : pose === 'sit' || pose === 'sit_relaxed' ? -18 : pose === 'bend_pickup' ? -22 : -27;
+  const shoulderY = pose === 'kneel' || pose === 'crouch' ? -37 : pose === 'sit' || pose === 'sit_relaxed' ? -40 : hipY - 22;
 
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
 
-  // Soft floor contact shadow
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+  // Floor contact shadow (wider for horizontal/bed poses)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.44)';
   ctx.beginPath();
-  ctx.ellipse(0, 0, 12 * slim, 3.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, pose === 'down' || pose === 'lie_bed' ? 28 : 12 * slim, pose === 'down' ? 4.2 : 3.2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  const coat = spec.attireColor || PAL.COP_NAVY;
-  const coatShade = spec.attireShade || PAL.COP_DARK;
-  const pants = spec.pantsColor || PAL.SUIT_DARK;
-  const [skin] = SKIN_RAMPS[spec.skin || 'fair'] || SKIN_RAMPS.fair;
+  if (pose === 'lie_bed') {
+    ctx.translate(facing * 8, -4);
+    ctx.rotate(Math.PI * 0.47 * -facing);
+  } else if (pose === 'down' || pose === 'prone') {
+    ctx.translate(facing * 4, -5);
+    ctx.rotate(Math.PI * 0.49 * -facing);
+  } else if (pose === 'hit') {
+    ctx.rotate(-facing * 0.28);
+  } else if (pose === 'shoot') {
+    ctx.translate(-facing * 2.5, 0);
+  }
 
-  // Umbrella overhead if carried
-  if (opts.umbrella) {
+  if (opts.umbrella || prop === 'umbrella') {
     ctx.strokeStyle = PAL.WOOD_MID;
     ctx.lineWidth = 1.8;
     ctx.beginPath();
@@ -170,20 +188,40 @@ export function drawAnatomicalActor(ctx, x, y, spec = {}, opts = {}) {
     ctx.fill();
   }
 
-  // Legs & boots
-  const kneel = pose === 'kneel';
-  const runShift = pose === 'run' ? Math.sin(tick * 0.7) * 5 : 0;
-  const hipY = kneel ? -16 : -27;
-  drawRoundedLimb(ctx, -4 * slim, hipY, -4.5 * slim - runShift, kneel ? -4 : -2, 5.2 * slim, pants);
-  drawRoundedLimb(ctx, 4 * slim, hipY, 4.5 * slim + runShift, -2, 5.2 * slim, pants);
-  ctx.fillStyle = '#090b10';
+  // Legs & feet
+  const stridePhase = opts.walkCycle != null ? opts.walkCycle : tick * (pose === 'run' ? 0.85 : 0.45);
+  const walkShift = (pose === 'walk' || pose === 'run') ? Math.sin(stridePhase) * (pose === 'run' ? 6 : 4) : 0;
+  if (pose === 'sit' || pose === 'sit_relaxed') {
+    const ext = pose === 'sit_relaxed' ? 12 : 8;
+    drawRoundedLimb(ctx, -3 * slim, hipY, facing * ext, hipY + 3, 5 * slim, pants);
+    drawRoundedLimb(ctx, 3 * slim, hipY, facing * ext, hipY + 3, 5 * slim, pants);
+    drawRoundedLimb(ctx, facing * ext, hipY + 3, facing * (ext + 1), -2, 4.6 * slim, pants);
+  } else {
+    const footY = pose === 'kneel' || pose === 'crouch' ? -4 : -2;
+    drawRoundedLimb(ctx, -4 * slim, hipY, -4.5 * slim - walkShift, footY, 5.2 * slim, pants);
+    drawRoundedLimb(ctx, 4 * slim, hipY, 4.5 * slim + walkShift, -2, 5.2 * slim, pants);
+  }
+  ctx.fillStyle = outfit.isNaked ? skinShade : '#090b10';
   ctx.beginPath();
-  ctx.ellipse(-4.5 * slim - runShift + facing * 1.5, -1.5, 4.2, 2.1, 0, 0, Math.PI * 2);
-  ctx.ellipse(4.5 * slim + runShift + facing * 1.5, -1.5, 4.2, 2.1, 0, 0, Math.PI * 2);
+  ctx.ellipse(-4.5 * slim - walkShift + facing * 1.5, -1.5, 4, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(4.5 * slim + walkShift + facing * 1.5, -1.5, 4, 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Tapered torso + lapels/trench skirt
-  const shoulderY = kneel ? -37 : -49;
+  if (opts.condition === 'wounded_leg' || opts.condition === 'hospitalized') {
+    ctx.fillStyle = '#f0f2f8';
+    ctx.fillRect(1 * facing, hipY + 6, 7, 4.5);
+    ctx.fillStyle = PAL.RED_STROBE;
+    ctx.fillRect(3 * facing, hipY + 7, 2.5, 2);
+  }
+
+  // Upper torso group (supports bending forward on bend_pickup!)
+  ctx.save();
+  if (pose === 'bend_pickup') {
+    ctx.translate(0, hipY);
+    ctx.rotate(facing * 0.68);
+    ctx.translate(0, -hipY);
+  }
+
   const sw = 10.5 * slim;
   const ww = 7.4 * slim;
   ctx.fillStyle = coat;
@@ -191,7 +229,7 @@ export function drawAnatomicalActor(ctx, x, y, spec = {}, opts = {}) {
   ctx.moveTo(-sw, shoulderY);
   ctx.quadraticCurveTo(0, shoulderY - 3, sw, shoulderY);
   ctx.lineTo(ww, hipY + 3);
-  if (spec.longCoat) {
+  if (spec.longCoat || outfit.hasGown) {
     ctx.lineTo(ww + 3, hipY + 13);
     ctx.lineTo(-ww - 3, hipY + 13);
   }
@@ -199,7 +237,7 @@ export function drawAnatomicalActor(ctx, x, y, spec = {}, opts = {}) {
   ctx.closePath();
   ctx.fill();
 
-  // Tailored torso shadow fold
+  // Shading contour (or abdominal contour when naked)
   ctx.fillStyle = coatShade;
   ctx.beginPath();
   ctx.moveTo(0, shoulderY);
@@ -209,83 +247,95 @@ export function drawAnatomicalActor(ctx, x, y, spec = {}, opts = {}) {
   ctx.closePath();
   ctx.fill();
 
-  // Shirt collar / tie or Silk robe lapel
-  ctx.fillStyle = spec.robe ? PAL.BED_LINEN : PAL.WHITE_SHIRT;
-  ctx.beginPath();
-  ctx.moveTo(-3.2, shoulderY - 1);
-  ctx.lineTo(3.2, shoulderY - 1);
-  ctx.lineTo(0, shoulderY + 7);
-  ctx.closePath();
-  ctx.fill();
+  if (!outfit.isNaked && outfit.collarColor) {
+    ctx.fillStyle = outfit.collarColor;
+    ctx.beginPath();
+    ctx.moveTo(-3.2, shoulderY - 1);
+    ctx.lineTo(3.2, shoulderY - 1);
+    ctx.lineTo(0, shoulderY + 7);
+    ctx.closePath();
+    ctx.fill();
+    if (outfit.hasTie) {
+      ctx.fillStyle = '#7e1c24';
+      ctx.fillRect(-1, shoulderY + 1, 2, 11);
+    }
+  } else if (outfit.isNaked) {
+    ctx.strokeStyle = skinShade;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-4, shoulderY + 5);
+    ctx.lineTo(4, shoulderY + 5);
+    ctx.stroke();
+  }
 
-  if (spec.badge) {
+  if (outfit.badge) {
     ctx.fillStyle = PAL.GOLD_BADGE;
     ctx.beginPath();
     ctx.arc(facing * 4.5 * slim, shoulderY + 6.5, 2.1, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (spec.belt !== false && !spec.robe) {
+  if (outfit.belt) {
     ctx.fillStyle = '#0c0e14';
     ctx.fillRect(-ww, hipY - 1, ww * 2, 3);
     ctx.fillStyle = PAL.CHROME;
     ctx.fillRect(-1.5, hipY - 1, 3, 3);
   }
+  if (opts.condition === 'wounded_arm') {
+    ctx.fillStyle = '#f0f2f8';
+    ctx.fillRect(-sw + 2, shoulderY + 2, sw * 2 - 4, 4);
+  }
 
-  // Arms & hands by pose
+  // Arms + hand coordinates `(hx, hy)` and mouth target `(mx, my)` for props
   const armY = shoulderY + 3;
-  drawRoundedLimb(ctx, -sw, armY, -sw - 2, armY + 14, 4.2 * slim, coat);
-  if (pose === 'aim') {
-    drawRoundedLimb(ctx, sw, armY, sw + facing * 13, armY - 1, 4.0 * slim, coat);
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.arc(sw + facing * 14, armY - 1, 2.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = PAL.STEEL_LIT;
-    ctx.fillRect(sw + facing * 14, armY - 3, facing * 7, 2.4);
+  const headCy = shoulderY - 9.5;
+  const mx = facing * 3.5;
+  const my = headCy + 4.8;
+  let hx = sw + facing * 2;
+  let hy = armY + 14;
+
+  const backSwing = (pose === 'walk' || pose === 'run') ? walkShift * 0.9 : 0;
+  drawRoundedLimb(ctx, -sw, armY, -sw - 2 - backSwing, armY + 14, 4.1 * slim, coat);
+
+  if (pose === 'aim' || pose === 'shoot') {
+    hx = sw + facing * 13;
+    hy = armY - 1;
+    drawRoundedLimb(ctx, sw, armY, hx, hy, 4.0 * slim, coat);
   } else if (pose === 'handsup') {
+    hx = sw + 4;
+    hy = armY - 14;
     drawRoundedLimb(ctx, -sw, armY, -sw - 4, armY - 14, 4.0 * slim, coat);
-    drawRoundedLimb(ctx, sw, armY, sw + 4, armY - 14, 4.0 * slim, coat);
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.arc(-sw - 4, armY - 15, 2, 0, Math.PI * 2);
-    ctx.arc(sw + 4, armY - 15, 2, 0, Math.PI * 2);
-    ctx.fill();
+    drawRoundedLimb(ctx, sw, armY, hx, hy, 4.0 * slim, coat);
+  } else if (pose === 'bend_pickup') {
+    hx = facing * 10;
+    hy = hipY + 18;
+    drawRoundedLimb(ctx, sw * facing, armY, hx, hy, 4.0 * slim, coat);
+  } else if (pose === 'smoke' || pose === 'sip' || pose === 'talk_gesture') {
+    hx = mx + facing * 4;
+    hy = my + 1;
+    drawRoundedLimb(ctx, sw * facing, armY, hx, hy, 3.8 * slim, coat);
   } else if (pose === 'flashlight') {
-    drawRoundedLimb(ctx, sw, armY, sw + facing * 11, armY + 2, 4.0 * slim, coat);
-    ctx.fillStyle = PAL.AMBER;
-    ctx.fillRect(sw + facing * 10, armY + 1, facing * 4, 2.5);
-    ctx.fillStyle = 'rgba(255, 232, 130, 0.17)';
-    ctx.beginPath();
-    ctx.moveTo(sw + facing * 14, armY + 2);
-    ctx.lineTo(sw + facing * 72, armY - 18);
-    ctx.lineTo(sw + facing * 72, armY + 22);
-    ctx.closePath();
-    ctx.fill();
+    hx = sw + facing * 11;
+    hy = armY + 2;
+    drawRoundedLimb(ctx, sw, armY, hx, hy, 4.0 * slim, coat);
+  } else if (pose === 'chill' || pose === 'sit' || pose === 'sit_relaxed') {
+    hx = facing * 8;
+    hy = hipY + 2;
+    drawRoundedLimb(ctx, sw * facing, armY, hx, hy, 4.0 * slim, coatShade);
   } else {
-    drawRoundedLimb(ctx, sw, armY, sw + 2, armY + 14, 4.2 * slim, coatShade);
-    ctx.fillStyle = skin;
-    ctx.beginPath();
-    ctx.arc(-sw - 2, armY + 15, 1.9, 0, Math.PI * 2);
-    ctx.arc(sw + 2, armY + 15, 1.9, 0, Math.PI * 2);
-    ctx.fill();
+    hx = sw * facing + backSwing;
+    hy = armY + 14;
+    drawRoundedLimb(ctx, sw * facing, armY, hx, hy, 4.1 * slim, coatShade);
   }
 
-  // Rossi's Pastries box with red baker's twine if carried
-  if (opts.rossiBox) {
-    const bx = -10;
-    const by = shoulderY + 13;
-    ctx.fillStyle = '#f4f2ee';
-    ctx.fillRect(bx, by, 12, 8);
-    ctx.strokeStyle = PAL.RED_STROBE;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(bx, by + 4);
-    ctx.lineTo(bx + 12, by + 4);
-    ctx.moveTo(bx + 6, by);
-    ctx.lineTo(bx + 6, by + 8);
-    ctx.stroke();
-  }
+  ctx.fillStyle = skin;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 1.9, 0, Math.PI * 2);
+  ctx.fill();
 
-  drawDetailedHead(ctx, 0, shoulderY - 9.5, { ...spec, mood: opts.mood }, facing, opts.rimColor);
+  const resolvedProp = prop || (pose === 'aim' || pose === 'shoot' ? 'pistol' : pose === 'flashlight' ? 'flashlight' : null);
+  drawHeldProp(ctx, resolvedProp, hx, hy, mx, my, facing, tick, pose);
+
+  drawDetailedHead(ctx, 0, headCy, { ...spec, hat: outfit.hat, mood: opts.mood }, facing, opts.rimColor);
+  ctx.restore();
   ctx.restore();
 }

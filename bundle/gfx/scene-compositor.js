@@ -8,6 +8,7 @@ import { SCENE_CATALOG } from '../assets/scene-catalog.js';
 import { CHARACTER_CATALOG } from '../assets/character-catalog.js';
 import { TIER_OPTIONS } from '../engine/mode-select.js';
 import { getModelShortLabel } from '../engine/anna-ai.js';
+import { defaultStageDirector } from './stage-director.js';
 
 const ALL_TEMPLATES = { ...TEMPLATES_A, ...TEMPLATES_B };
 
@@ -106,37 +107,81 @@ function drawCockpitFrame(ctx, state, tick) {
   drawAnatomicalActor(ctx, 418, 286, CHARACTER_CATALOG.claire, { scale: 1.35, facing: -1, tick });
 }
 
+function drawBallisticsOverlay(ctx, director) {
+  for (const pt of director.getParticles()) {
+    const alpha = Math.max(0.1, 1 - pt.life / pt.maxLife);
+    ctx.fillStyle = pt.color || PAL.FLAME_YELLOW;
+    ctx.globalAlpha = alpha;
+    if (pt.kind === 'muzzle') {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 7 * alpha, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (pt.kind === 'casing') {
+      ctx.fillRect(pt.x, pt.y, 3, 1.5);
+    } else {
+      ctx.fillRect(pt.x - 2, pt.y - 2, 4, 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+  for (const proj of director.getProjectiles()) {
+    const x = proj.x0 + (proj.x1 - proj.x0) * proj.progress;
+    const y = proj.y0 + (proj.y1 - proj.y0) * proj.progress;
+    const tx = proj.x0 + (proj.x1 - proj.x0) * Math.max(0, proj.progress - 0.25);
+    const ty = proj.y0 + (proj.y1 - proj.y0) * Math.max(0, proj.progress - 0.25);
+    ctx.strokeStyle = PAL.FLAME_YELLOW;
+    ctx.lineWidth = proj.weapon === 'shotgun' ? 2.4 : 1.6;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.fillStyle = PAL.WHITE_SHIRT;
+    ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+  }
+}
+
 export function drawSvgaScene(ctx, state, tick = 0, opts = {}) {
   const beat = opts.activeBeat || null;
-  const sceneId = beat?.sceneId || state.scene || 'precinct_briefing';
+  const director = opts.director || defaultStageDirector;
+  director.syncBeatStage(state, beat);
+
+  const sceneId = beat?.sceneId || state.intermission?.sceneId || state.scene || 'precinct_briefing';
   const entry = SCENE_CATALOG[sceneId] || SCENE_CATALOG.precinct_briefing;
   const renderFn = ALL_TEMPLATES[entry.tpl] || TEMPLATES_A.precinct_briefing;
 
+  const shake = director.getCameraShake();
+  const sx = shake.ms > 0 ? (Math.sin(tick * 3.1) * shake.intensity) : 0;
+  const sy = shake.ms > 0 ? (Math.cos(tick * 2.7) * shake.intensity * 0.6) : 0;
+
   ctx.clearRect(0, 0, 480, 270);
+  ctx.save();
+  ctx.translate(sx, sy);
   renderFn(ctx, state, tick);
 
-  for (const p of [...(entry.props || []), ...(beat?.props || [])]) {
+  for (const p of director.getStageProps()) {
     drawPropLayer(ctx, p, tick, state);
   }
 
-  // Actors (dynamic AI beat cast overrides or static scene defaults)
-  const actorDefs = Array.isArray(beat?.actors) && beat.actors.length
-    ? beat.actors.map((a, idx) => [a.id || a, 140 + idx * 115, 240, idx % 2 === 0 ? 1 : -1, { pose: a.pose || 'stand' }])
-    : entry.actors || [];
-
-  for (const [charId, ax, ay, facing = 1, extra = {}] of actorDefs) {
-    const spec = CHARACTER_CATALOG[charId];
+  const stageActors = [...director.getActors()].sort((a, b) => a.y - b.y);
+  for (const act of stageActors) {
+    const spec = CHARACTER_CATALOG[act.id];
     if (!spec) continue;
-    drawAnatomicalActor(ctx, ax, ay, spec, { ...extra, facing, tick });
+    drawAnatomicalActor(ctx, act.x, act.y, spec, { ...act, tick });
   }
 
+  drawBallisticsOverlay(ctx, director);
   drawWeatherOverlay(ctx, beat?.weather || entry.weather, tick);
   if (entry.cockpit) drawCockpitFrame(ctx, state, tick);
+  ctx.restore();
 
-  // Expressive 96x96 Talking-Head Portrait Cut-in when speaker is set
-  const speakerId = beat?.speakerId || state.intermission?.speakerId || opts.lastSpeakerId;
+  // Expressive 96x96 Talking-Head Portrait Cut-in with matching outfit & smoking prop
+  const spk = director.getActiveSpeaker();
+  const speakerId = beat?.speakerId || state.intermission?.speakerId || spk?.id || opts.lastSpeakerId;
   if (speakerId && CHARACTER_CATALOG[speakerId]) {
-    drawPortraitCutIn(ctx, 372, 10, 96, CHARACTER_CATALOG[speakerId], beat?.speakerMood || 'calm', tick);
+    const stageSpeaker = stageActors.find((a) => a.id === speakerId);
+    drawPortraitCutIn(ctx, 372, 10, 96, CHARACTER_CATALOG[speakerId], beat?.speakerMood || spk?.mood || 'calm', tick, {
+      outfit: stageSpeaker?.outfit,
+      prop: stageSpeaker?.prop,
+    });
   }
 
   // Game Over Overlay Banner

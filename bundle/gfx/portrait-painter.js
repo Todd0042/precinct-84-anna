@@ -1,15 +1,19 @@
 import { PAL, SKIN_RAMPS, HAIR_TONES, hexAlpha } from './svga-palette.js';
+import { resolveOutfitSpec } from '../assets/outfit-prop-catalog.js';
+import { drawHeldProp } from './scene-props.js';
 
 /**
  * Renders a detailed 112x112 1990s Neo-Noir Talking Portrait Card onto the canvas
- * with sculpted facial anatomy, mood-driven eyebrows/lips, glasses, hair & rim lighting.
+ * with sculpted facial anatomy, mood expressions, outfits, smoking props, glasses, hair & rim lighting.
  */
-export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick = 0) {
+export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick = 0, opts = {}) {
   if (!charSpec) return;
   const cx = x + size / 2;
   const cy = y + size * 0.49;
   const [skin, skinShade, skinHi] = SKIN_RAMPS[charSpec.skin || 'fair'] || SKIN_RAMPS.fair;
   const [hair, hairHi] = HAIR_TONES[charSpec.hair || 'black'] || HAIR_TONES.black;
+  const outfit = resolveOutfitSpec(charSpec, opts.outfit || charSpec.outfit || 'default');
+  const activeProp = opts.prop || charSpec.prop || null;
 
   ctx.save();
   // Card frame with noir backdrop + Venetian blind light streaks
@@ -30,8 +34,8 @@ export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick
     ctx.fillRect(x, by, size, 5);
   }
 
-  // Shoulders & tailored attire
-  const attire = charSpec.attireColor || PAL.COP_NAVY;
+  // Shoulders & tailored outfit (supports naked, formal, casual, bad_guy, police_uniform)
+  const attire = outfit.isNaked ? skin : outfit.attireColor;
   ctx.fillStyle = attire;
   ctx.beginPath();
   ctx.moveTo(x + 8, y + size);
@@ -39,15 +43,36 @@ export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick
   ctx.closePath();
   ctx.fill();
 
-  ctx.fillStyle = charSpec.robe ? PAL.BED_LINEN : PAL.WHITE_SHIRT;
-  ctx.beginPath();
-  ctx.moveTo(cx - 11, y + size - 25);
-  ctx.lineTo(cx + 11, y + size - 25);
-  ctx.lineTo(cx, y + size - 6);
-  ctx.closePath();
-  ctx.fill();
+  if (outfit.isNaked) {
+    ctx.strokeStyle = skinShade;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(cx - 16, y + size - 14);
+    ctx.quadraticCurveTo(cx, y + size - 10, cx + 16, y + size - 14);
+    ctx.stroke();
+  } else if (outfit.collarColor) {
+    ctx.fillStyle = outfit.collarColor;
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, y + size - 25);
+    ctx.lineTo(cx + 11, y + size - 25);
+    ctx.lineTo(cx, y + size - 6);
+    ctx.closePath();
+    ctx.fill();
+    if (outfit.hasTie) {
+      ctx.fillStyle = '#7e1c24';
+      ctx.fillRect(cx - 2.5, y + size - 22, 5, 16);
+    }
+  } else if (outfit.hasGown) {
+    ctx.fillStyle = skin;
+    ctx.beginPath();
+    ctx.moveTo(cx - 13, y + size - 26);
+    ctx.lineTo(cx + 13, y + size - 26);
+    ctx.lineTo(cx, y + size - 11);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-  if (charSpec.badge) {
+  if (outfit.badge) {
     ctx.fillStyle = PAL.GOLD_BADGE;
     ctx.beginPath();
     ctx.arc(cx + 17, y + size - 13, 4.5, 0, Math.PI * 2);
@@ -170,6 +195,10 @@ export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick
     ctx.stroke();
   }
 
+  if (activeProp === 'cigarette' || activeProp === 'cigar') {
+    drawHeldProp(ctx, activeProp, cx + 10, cy + 18, cx + 4, cy + 14, 1, tick, 'smoke', { portrait: true });
+  }
+
   // Top hair & cap/fedora
   ctx.fillStyle = hair;
   ctx.beginPath();
@@ -178,7 +207,7 @@ export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick
   ctx.fillStyle = hairHi;
   ctx.fillRect(cx - 8, cy - 23, 14, 2.5);
 
-  if (charSpec.hat === 'cop_cap') {
+  if (outfit.hat === 'cop_cap') {
     ctx.fillStyle = PAL.COP_NAVY;
     ctx.beginPath();
     ctx.ellipse(cx, cy - 22, 23, 9.5, 0, Math.PI, 0);
@@ -189,7 +218,7 @@ export function drawPortraitCutIn(ctx, x, y, size, charSpec, mood = 'calm', tick
     ctx.fill();
     ctx.fillStyle = PAL.GOLD_BADGE;
     ctx.fillRect(cx - 3, cy - 26, 6, 5);
-  } else if (charSpec.hat === 'fedora') {
+  } else if (outfit.hat === 'fedora') {
     ctx.fillStyle = PAL.TRENCH_SHADE;
     ctx.fillRect(cx - 26, cy - 19, 52, 4);
     ctx.beginPath();

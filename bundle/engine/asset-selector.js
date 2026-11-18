@@ -161,5 +161,8 @@ export function formatChapterAssetPoolPrompt(pool) {
     `SCENES police: ${s.police.join(', ')} | street: ${s.street.join(', ')} | harbor: ${s.harbor.join(', ')} | leisure: ${s.leisure.join(', ')}`,
     `BGM: ${pool.bgm.join(', ')}`,
     `SFX: ${pool.sfx.join(', ')}`,
+    'OUTFITS: police_uniform, bad_guy, casual, formal, naked | POSES: stand, walk, run, chill, sit, lie_bed, bend_pickup, smoke, sip, aim, shoot, kneel, down, handsup',
+    'PROPS: cigarette, cigar, coffee_cup, whiskey_glass, beer_bottle, pistol, shotgun, smg, flashlight, handcuffs, walkie_talkie, badge_id, case_folder, evidence_bag, cash_briefcase, bribe_envelope, rossi_box, brass_watch, motel_key, syringe',
+    'LANDMARKS: bed_left, bed_right, booth_left, booth_right, table, doorway, center, cover_left, cover_right, evidence_spot',
   ].join('\n');
 }
