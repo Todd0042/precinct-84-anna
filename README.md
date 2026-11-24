@@ -38,3 +38,7 @@ To stage or publish to your Anna developer account later:
 cd /workspace/precinct-84-anna
 anna-app publish             # Push working draft & cut v0.1.0 (stays in DRAFT)
 ```
+
+## License
+
+Copyright (c) 2026 [Todd0042](https://github.com/Todd0042). Source-available under the **[PolyForm Noncommercial License 1.0.0](LICENSE)**: free for personal, hobby, educational, research and nonprofit use. Commercial use (inside a company, in a paid product or service, or for profit) requires a separate license from [Todd0042](https://github.com/Todd0042). Third-party components keep their own licenses.
